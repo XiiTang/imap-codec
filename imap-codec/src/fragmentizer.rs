@@ -111,6 +111,13 @@ impl Fragmentizer {
         }
     }
 
+    /// Hand off bytes following a completely decoded message to a new
+    /// transport security layer. No partially parsed message may be detached.
+    pub fn take_unparsed_after_message(&mut self) -> Option<Vec<u8>> {
+        if !self.is_message_complete() { return None; }
+        Some(std::mem::take(&mut self.unparsed_buffer).into())
+    }
+
     /// Continue parsing the current message until the next fragment is detected.
     ///
     /// Returns `None` if more bytes need to be enqueued via [`Fragmentizer::enqueue_bytes`].
@@ -1593,5 +1600,20 @@ mod tests {
         assert_eq!(parse_tag(b"\r\n"), None);
         assert_eq!(parse_tag(b""), None);
         assert_eq!(parse_tag(b" A1 NOOP\r\n"), None);
+    }
+}
+
+#[cfg(test)]
+mod runtime_handoff_tests {
+    use super::*;
+    #[test]
+    fn handoff_requires_a_complete_message_and_retains_next_layer_bytes() {
+        let mut parser=Fragmentizer::new(1024);
+        parser.enqueue_bytes(b"A1 OK authenticated\r\n\0\0\0\x05abcde");
+        assert!(parser.take_unparsed_after_message().is_none());
+        parser.progress().unwrap();
+        assert!(parser.is_message_complete());
+        assert_eq!(parser.take_unparsed_after_message().unwrap(),b"\0\0\0\x05abcde");
+        assert!(parser.take_unparsed_after_message().unwrap().is_empty());
     }
 }
