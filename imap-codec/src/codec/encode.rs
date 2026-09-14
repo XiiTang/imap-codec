@@ -45,7 +45,6 @@
 //! C: Pa²²W0rD
 //! ```
 
-#[cfg(feature = "ext_condstore_qresync")]
 use std::num::NonZeroU64;
 use std::{borrow::Borrow, collections::VecDeque, io::Write, num::NonZeroU32};
 
@@ -1241,7 +1240,6 @@ impl EncodeIntoContext for NonZeroU32 {
     }
 }
 
-#[cfg(feature = "ext_condstore_qresync")]
 impl EncodeIntoContext for NonZeroU64 {
     fn encode_ctx(&self, ctx: &mut EncodeContext) -> std::io::Result<()> {
         write!(ctx, "{self}")

@@ -80,6 +80,7 @@ impl ClientCapabilities {
             Err(format!("IMAP capability {name} is required"))
         }
     }
+    #[cfg(feature = "ext_condstore_qresync")]
     fn require_enabled(&self, name: &str) -> Result<(), String> {
         if self.enabled.contains(name) {
             Ok(())
