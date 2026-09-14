@@ -293,7 +293,10 @@ pub(crate) fn body_fld_octets(input: &[u8]) -> IMAPResult<&[u8], u64> {
     #[cfg(not(feature = "quirk_rectify_numbers"))]
     return crate::extensions::rev2::number63(input);
     #[cfg(feature = "quirk_rectify_numbers")]
-    return alt((crate::extensions::rev2::number63, map(tuple((tag("-"), crate::extensions::rev2::number63)), |_| 0)))(input);
+    return alt((
+        crate::extensions::rev2::number63,
+        map(tuple((tag("-"), crate::extensions::rev2::number63)), |_| 0),
+    ))(input);
 }
 
 /// RFC 9051 uses 63-bit body line counts.
@@ -419,7 +422,7 @@ fn body_extension_limited(
 
     alt((
         map(nstring, BodyExtension::NString),
-        map(number, BodyExtension::Number),
+        map(crate::extensions::rev2::number63, BodyExtension::Number),
         map(
             delimited(tag(b"("), separated_list1(sp, body_extension), tag(b")")),
             |body_extensions| BodyExtension::List(Vec1::unvalidated(body_extensions)),

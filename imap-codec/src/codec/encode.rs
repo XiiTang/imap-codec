@@ -152,6 +152,55 @@ impl Iterator for Encoded {
     }
 }
 
+/// Metadata for a single APPEND whose literal is supplied incrementally.
+/// Encoding allocates only metadata, irrespective of `length`.
+#[derive(Clone, Debug)]
+pub struct StreamedAppend {
+    pub tag: Tag<'static>,
+    pub mailbox: Mailbox<'static>,
+    pub flags: Vec<Flag<'static>>,
+    pub date: Option<DateTime>,
+    pub length: u64,
+    pub binary: bool,
+    pub mode: LiteralMode,
+}
+impl StreamedAppend {
+    /// Encode through the body literal announcement, without body or final CRLF.
+    pub fn encode_prefix(&self) -> Result<Encoded, &'static str> {
+        if self.length > i64::MAX as u64 {
+            return Err("APPEND length exceeds the IMAP 63-bit range");
+        }
+        let mut ctx = EncodeContext::new();
+        self.tag.encode_ctx(&mut ctx).unwrap();
+        ctx.write_all(b" APPEND ").unwrap();
+        self.mailbox.encode_ctx(&mut ctx).unwrap();
+        if !self.flags.is_empty() {
+            ctx.write_all(b" (").unwrap();
+            join_serializable(&self.flags, b" ", &mut ctx).unwrap();
+            ctx.write_all(b")").unwrap();
+        }
+        if let Some(date) = &self.date {
+            ctx.write_all(b" ").unwrap();
+            date.encode_ctx(&mut ctx).unwrap();
+        }
+        write!(
+            &mut ctx,
+            " {}{{{}{}}}\r\n",
+            if self.binary { "~" } else { "" },
+            self.length,
+            if self.mode == LiteralMode::NonSync {
+                "+"
+            } else {
+                ""
+            }
+        )
+        .unwrap();
+        Ok(Encoded {
+            items: ctx.into_items(),
+        })
+    }
+}
+
 /// The intended action of a client or server.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Fragment {
@@ -2349,5 +2398,25 @@ mod tests {
 
             assert_eq!(encoder.collect::<Vec<_>>(), actions);
         }
+    }
+}
+
+#[cfg(test)]
+mod streamed_append_tests {
+    use super::*;
+    #[test]
+    fn large_binary_append_encodes_metadata_only_and_gates_real_length() {
+        use crate::client_capabilities::{ClientCapabilities, Version};
+        let mut append = StreamedAppend { tag: Tag::try_from("A1").unwrap(), mailbox: Mailbox::Inbox,
+            flags: vec![], date: None, length: i64::MAX as u64, binary: true, mode: LiteralMode::Sync };
+        assert_eq!(append.encode_prefix().unwrap().dump(), b"A1 APPEND INBOX ~{9223372036854775807}\r\n");
+        let caps = ClientCapabilities::new(["IMAP4REV2", "BINARY"].into_iter().map(str::to_owned).collect(), Version::Rev2);
+        assert!(caps.validate_streamed_append(&append).is_ok());
+        append.mode = LiteralMode::NonSync;
+        assert!(caps.validate_streamed_append(&append).is_err());
+        append.length = 4096;
+        assert!(caps.validate_streamed_append(&append).is_ok());
+        append.length = i64::MAX as u64 + 1;
+        assert!(append.encode_prefix().is_err());
     }
 }

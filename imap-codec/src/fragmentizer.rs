@@ -171,6 +171,23 @@ impl Fragmentizer {
         fragment
     }
 
+    /// Correct a lexical literal lookalike at a complete, valid message boundary.
+    /// For example, tagged human-readable text may legitimately end in "{123}".
+    pub fn complete_if_decodable<C: Decoder>(&mut self, codec: &C) -> bool {
+        if self.message_poisoned || self.max_message_size_exceeded {
+            return false;
+        }
+        if codec
+            .decode(&self.message_buffer)
+            .is_ok_and(|(rest, _)| rest.is_empty())
+        {
+            self.parser = None;
+            true
+        } else {
+            false
+        }
+    }
+
     /// Enqueues more byte that can be parsed by [`Fragmentizer::progress`].
     ///
     /// Note that the message size limit is not enforced on the enqueued bytes. You can control

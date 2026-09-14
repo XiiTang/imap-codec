@@ -126,7 +126,7 @@ impl EncodeIntoContext for ExtensionValue<'_> {
     }
 }
 fn search_return(input: &[u8]) -> IMAPResult<&[u8], SearchReturn> {
-    map(
+    let (rest, value) = map(
         separated_pair(
             label,
             nom::combinator::success(()),
@@ -140,7 +140,19 @@ fn search_return(input: &[u8]) -> IMAPResult<&[u8], SearchReturn> {
             "SAVE" if parameters.is_none() => SearchReturn::Save,
             _ => SearchReturn::Extension { name, parameters },
         },
-    )(input)
+    )(input)?;
+    if let SearchReturn::Extension { name, .. } = &value {
+        if matches!(
+            name.as_ref().to_ascii_uppercase().as_str(),
+            "MIN" | "MAX" | "ALL" | "COUNT" | "SAVE"
+        ) {
+            return Err(nom::Err::Error(IMAPParseError {
+                input,
+                kind: IMAPErrorKind::Nom(nom::error::ErrorKind::Verify),
+            }));
+        }
+    }
+    Ok((rest, value))
 }
 pub(crate) fn extended_search(input: &[u8]) -> IMAPResult<&[u8], CommandBody> {
     let (rest, (_, returns, charset, _, criteria)) = tuple((
@@ -255,7 +267,7 @@ pub(crate) fn encode_esearch(
     Ok(())
 }
 fn list_return(input: &[u8]) -> IMAPResult<&[u8], ListReturn> {
-    alt((
+    let (rest, value) = alt((
         map(
             preceded(
                 tag_no_case(b"STATUS "),
@@ -276,7 +288,19 @@ fn list_return(input: &[u8]) -> IMAPResult<&[u8], ListReturn> {
                 _ => ListReturn::Extension { name, parameters },
             },
         ),
-    ))(input)
+    ))(input)?;
+    if let ListReturn::Extension { name, .. } = &value {
+        if matches!(
+            name.as_ref().to_ascii_uppercase().as_str(),
+            "STATUS" | "CHILDREN" | "SUBSCRIBED" | "SPECIAL-USE"
+        ) {
+            return Err(nom::Err::Error(IMAPParseError {
+                input,
+                kind: IMAPErrorKind::Nom(nom::error::ErrorKind::Verify),
+            }));
+        }
+    }
+    Ok((rest, value))
 }
 pub(crate) fn list(input: &[u8]) -> IMAPResult<&[u8], CommandBody> {
     let (rest, (_, selection, reference, _, patterns, returns)) = tuple((
@@ -485,6 +509,9 @@ mod tests {
             b"A LIST (RECURSIVEMATCH) \"\" *\r\n",
             b"A SEARCH RETURN (ALL) LARGER 9223372036854775808\r\n",
             b"A FETCH $ BODY[]<1.0>\r\n",
+            b"A SEARCH RETURN (MIN 1) ALL\r\n",
+            b"A LIST () \"\" * RETURN (STATUS)\r\n",
+            b"A LIST () \"\" * RETURN (CHILDREN 1)\r\n",
         ] {
             assert!(
                 CommandCodec::default().decode(bytes).is_err(),

@@ -387,6 +387,39 @@ impl ClientCapabilities {
         }
         Ok(())
     }
+    /// Validate streamed APPEND using its announced length, not a placeholder payload size.
+    pub fn validate_streamed_append(
+        &self,
+        append: &crate::encode::StreamedAppend,
+    ) -> Result<(), String> {
+        let fragments = append.encode_prefix().map_err(str::to_owned)?;
+        if append.binary {
+            self.require("BINARY")?;
+        }
+        if append.mode == imap_types::core::LiteralMode::NonSync
+            && !self.supports("LITERAL+")
+            && !(append.length <= 4096 && self.supports("LITERAL-"))
+        {
+            return Err("Non-synchronizing APPEND length was not negotiated".into());
+        }
+        for fragment in fragments {
+            match fragment {
+                Fragment::Line { data } if !self.utf8_active() && !data.is_ascii() => {
+                    return Err("UTF-8 quoted strings require UTF8=ACCEPT or IMAP4rev2".into());
+                }
+                Fragment::Literal {
+                    data,
+                    mode: imap_types::core::LiteralMode::NonSync,
+                } if !self.supports("LITERAL+")
+                    && !(data.len() <= 4096 && self.supports("LITERAL-")) =>
+                {
+                    return Err("Non-synchronizing mailbox literal was not negotiated".into());
+                }
+                _ => {}
+            }
+        }
+        Ok(())
+    }
     fn status_names(&self, names: &[imap_types::status::StatusDataItemName]) -> Result<(), String> {
         use imap_types::status::StatusDataItemName::*;
         for n in names {

@@ -334,7 +334,7 @@ pub enum BodyExtension<'a> {
     /// NString.
     NString(NString<'a>),
     /// Number.
-    Number(u32),
+    Number(u64),
     /// List.
     List(Vec1<BodyExtension<'a>>),
 }

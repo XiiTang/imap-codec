@@ -457,7 +457,7 @@ fn arbitrary_body_extension_limited<'a>(
 
     Ok(match u.int_in_range(1..=2)? {
         1 => BodyExtension::NString(NString::arbitrary(u)?),
-        2 => BodyExtension::Number(u32::arbitrary(u)?),
+        2 => BodyExtension::Number(u64::arbitrary(u)? & i64::MAX as u64),
         3 => BodyExtension::List({
             let body_extensions = {
                 let len = u.arbitrary_len::<BodyExtension>()?;
@@ -485,7 +485,7 @@ fn arbitrary_body_extension_leaf<'a>(
 ) -> arbitrary::Result<BodyExtension<'a>> {
     Ok(match u.int_in_range(1..=2)? {
         1 => BodyExtension::NString(NString::arbitrary(u)?),
-        2 => BodyExtension::Number(u32::arbitrary(u)?),
+        2 => BodyExtension::Number(u64::arbitrary(u)? & i64::MAX as u64),
         // No `BodyExtension::List` because it could recurse.
         _ => unreachable!(),
     })
