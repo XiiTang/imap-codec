@@ -350,10 +350,10 @@ impl ClientCapabilities {
                         } => {
                             self.require_enabled("QRESYNC")?;
                             if let Some(s) = known_uids {
-                                explicit_set(s)?;
+                                explicit_set(s, false)?;
                             }
                             if let Some((seq, uids)) = seq_match_data {
-                                if explicit_set(seq)? != explicit_set(uids)? {
+                                if explicit_set(seq, true)? != explicit_set(uids, true)? {
                                     return Err("QRESYNC sequence and UID match sets must have equal cardinality".into());
                                 }
                             }
@@ -439,9 +439,10 @@ impl ClientCapabilities {
     }
 }
 #[cfg(feature = "ext_condstore_qresync")]
-fn explicit_set(set: &imap_types::sequence::SequenceSet) -> Result<u64, String> {
+fn explicit_set(set: &imap_types::sequence::SequenceSet, ordered: bool) -> Result<u64, String> {
     use imap_types::sequence::{SeqOrUid, Sequence};
     let mut total = 0u64;
+    let mut previous = 0;
     for seq in set.0.as_ref() {
         let (a, b) = match seq {
             Sequence::Single(a) => (a, a),
@@ -450,6 +451,12 @@ fn explicit_set(set: &imap_types::sequence::SequenceSet) -> Result<u64, String> 
         let (SeqOrUid::Value(a), SeqOrUid::Value(b)) = (a, b) else {
             return Err("QRESYNC match sets cannot contain '*'".into());
         };
+        // RFC 7162 section 3.2.5.2: match sets represent ordered pairs.
+        // Walk only the encoded ranges, even for the full 32-bit UID space.
+        if ordered && (a > b || a.get() <= previous) {
+            return Err("QRESYNC match sets must be ascending without overlaps".into());
+        }
+        previous = b.get();
         total = total
             .checked_add(u64::from(a.get().abs_diff(b.get())) + 1)
             .ok_or("QRESYNC set cardinality overflow")?;
@@ -511,6 +518,34 @@ mod tests {
         assert!(validate(&c, select).is_ok());
         assert!(validate(&c, b"A SELECT inbox (QRESYNC (42 1000 1:*))\r\n").is_err());
         assert!(validate(&c, b"A SELECT inbox (QRESYNC (42 1000 (1:3 4:5)))\r\n").is_err());
+        // Match data is ordered and unique; the independent known-UID set is not.
+        assert!(
+            validate(
+                &c,
+                b"A SELECT inbox (QRESYNC (42 1000 9:1,3 (1:3,5 4:6,9)))\r\n"
+            )
+            .is_ok()
+        );
+        assert!(
+            validate(
+                &c,
+                b"A SELECT inbox (QRESYNC (42 1000 (1:4294967295 1:4294967295)))\r\n"
+            )
+            .is_ok()
+        );
+        for matched in [
+            "3:1 4:6",
+            "1:3 6:4",
+            "1,1 4,5",
+            "1,2 4,4",
+            "1:3,3:5 4:9",
+            "1:6 4:6,6:8",
+            "3,1 4,5",
+            "1,2 5,4",
+        ] {
+            let wire = format!("A SELECT inbox (QRESYNC (42 1000 ({matched})))\r\n");
+            assert!(validate(&c, wire.as_bytes()).is_err(), "{matched}");
+        }
         assert!(validate(&c, b"A UID FETCH 1:* FLAGS (VANISHED)\r\n").is_err());
         assert!(validate(&c, b"A FETCH 1:* FLAGS (CHANGEDSINCE 1000 VANISHED)\r\n").is_err());
         assert!(

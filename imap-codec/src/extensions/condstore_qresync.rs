@@ -11,25 +11,22 @@ use nom::{
     sequence::{delimited, preceded, tuple},
 };
 
-use crate::{
-    core::{atom, number64},
-    decode::IMAPResult,
-};
+use crate::{core::atom, decode::IMAPResult, extensions::rev2::number63};
 
 /// ```abnf
 /// mod-sequence-valzer = "0" / mod-sequence-value
 /// ```
 pub(crate) fn mod_sequence_valzer(input: &[u8]) -> IMAPResult<&[u8], u64> {
-    number64(input)
+    number63(input)
 }
 
-/// Positive unsigned 64-bit integer (mod-sequence) (1 <= n < 18,446,744,073,709,551,615)
+/// RFC 7162 positive unsigned 63-bit integer (1 <= n <= 9,223,372,036,854,775,807).
 ///
 /// ```abnf
 /// mod-sequence-value  = 1*DIGIT
 /// ```
 pub(crate) fn mod_sequence_value(input: &[u8]) -> IMAPResult<&[u8], NonZeroU64> {
-    map_res(number64, NonZeroU64::try_from)(input)
+    map_res(number63, NonZeroU64::try_from)(input)
 }
 
 /// ```abnf
@@ -142,6 +139,59 @@ pub(crate) fn entry_type_req(input: &[u8]) -> IMAPResult<&[u8], EntryTypeReq> {
 mod tests {
     use crate::response::resp_text;
 
+    #[test]
+    fn modseq_uses_rfc7162_positive_63_bit_range() {
+        use crate::{CommandCodec, ResponseCodec, decode::Decoder, encode::Encoder};
+        for value in [
+            "0",
+            "1",
+            "9223372036854775807",
+            "9223372036854775808",
+            "18446744073709551615",
+            "18446744073709551616",
+        ] {
+            let in_range = value.parse::<u64>().is_ok_and(|v| v <= i64::MAX as u64);
+            for (template, zero_allowed) in [
+                ("A SEARCH MODSEQ {}\r\n", true),
+                ("A STORE 1 (UNCHANGEDSINCE {}) +FLAGS (\\Seen)\r\n", true),
+                ("A FETCH 1 FLAGS (CHANGEDSINCE {})\r\n", false),
+                ("A SELECT inbox (QRESYNC (42 {}))\r\n", false),
+            ] {
+                let wire = template.replace("{}", value);
+                assert_eq!(
+                    CommandCodec::default().decode(wire.as_bytes()).is_ok(),
+                    in_range && (zero_allowed || value != "0"),
+                    "{wire}"
+                );
+            }
+            let code = format!("HIGHESTMODSEQ {value}]");
+            assert_eq!(
+                crate::response::resp_text_code(code.as_bytes()).is_ok(),
+                in_range && value != "0",
+                "{code}"
+            );
+            for (template, zero_allowed) in [
+                ("* ESEARCH MODSEQ {}\r\n", false),
+                ("* SEARCH 1 (MODSEQ {})\r\n", false),
+                ("* 1 FETCH (MODSEQ ({}))\r\n", false),
+                ("* STATUS INBOX (HIGHESTMODSEQ {})\r\n", true),
+            ] {
+                let wire = template.replace("{}", value);
+                let decoded = ResponseCodec::default().decode(wire.as_bytes());
+                assert_eq!(
+                    decoded.is_ok(),
+                    in_range && (zero_allowed || value != "0"),
+                    "{wire}"
+                );
+                if let Ok((_, response)) = decoded {
+                    assert_eq!(
+                        ResponseCodec::default().encode(&response).dump(),
+                        wire.as_bytes()
+                    );
+                }
+            }
+        }
+    }
     #[test]
     fn test_condstore_qresync_codes() {
         assert!(resp_text(b"[MODIFIED 7,9] Conditional STORE failed\r\n").is_ok());
