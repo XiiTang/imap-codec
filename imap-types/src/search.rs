@@ -36,6 +36,10 @@ pub enum SearchKey<'a> {
     /// All messages in the mailbox; the default initial key for ANDing.
     All,
 
+    /// The server-owned saved search result, in sequence or UID context.
+    SearchResult,
+    UidSearchResult,
+
     /// Messages with the \Answered flag set.
     Answered,
 
@@ -81,7 +85,7 @@ pub enum SearchKey<'a> {
 
     /// Messages with an [RFC-2822] size larger than the specified
     /// number of octets.
-    Larger(u32),
+    Larger(u64),
 
     /// Messages that have the \Recent flag set but not the \Seen flag.
     /// This is functionally equivalent to "(RECENT UNSEEN)".
@@ -126,7 +130,7 @@ pub enum SearchKey<'a> {
 
     /// Messages with an [RFC-2822] size smaller than the specified
     /// number of octets.
-    Smaller(u32),
+    Smaller(u64),
 
     /// Messages that contain the specified string in the envelope
     /// structure's SUBJECT field.

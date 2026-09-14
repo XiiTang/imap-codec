@@ -289,26 +289,16 @@ pub(crate) fn body_fld_enc(input: &[u8]) -> IMAPResult<&[u8], IString> {
 ///
 /// * A negative number, specifically `-1`, in Dovecot.
 #[allow(clippy::needless_return)]
-pub(crate) fn body_fld_octets(input: &[u8]) -> IMAPResult<&[u8], u32> {
+pub(crate) fn body_fld_octets(input: &[u8]) -> IMAPResult<&[u8], u64> {
     #[cfg(not(feature = "quirk_rectify_numbers"))]
-    return number(input);
-
+    return crate::extensions::rev2::number63(input);
     #[cfg(feature = "quirk_rectify_numbers")]
-    {
-        return alt((
-            number,
-            map(tuple((tag("-"), number)), |(_, _)| {
-                log::warn!("Rectified negative number to 0");
-                0
-            }),
-        ))(input);
-    }
+    return alt((crate::extensions::rev2::number63, map(tuple((tag("-"), crate::extensions::rev2::number63)), |_| 0)))(input);
 }
 
-#[inline]
-/// `body-fld-lines = number`
-pub(crate) fn body_fld_lines(input: &[u8]) -> IMAPResult<&[u8], u32> {
-    number(input)
+/// RFC 9051 uses 63-bit body line counts.
+pub(crate) fn body_fld_lines(input: &[u8]) -> IMAPResult<&[u8], u64> {
+    crate::extensions::rev2::number63(input)
 }
 
 /// ```abnf

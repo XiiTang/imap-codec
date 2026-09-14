@@ -14,6 +14,8 @@ use serde::{Deserialize, Serialize};
 pub enum StatusDataItemName {
     /// The number of messages in the mailbox.
     Messages,
+    /// Aggregate message size (RFC 8438 / RFC 9051).
+    Size,
 
     /// The number of messages with the \Recent flag set.
     Recent,
@@ -47,6 +49,8 @@ pub enum StatusDataItemName {
 pub enum StatusDataItem {
     /// The number of messages in the mailbox.
     Messages(u32),
+    /// Aggregate message size, an unsigned 63-bit number.
+    Size(u64),
 
     /// The number of messages with the \Recent flag set.
     Recent(u32),

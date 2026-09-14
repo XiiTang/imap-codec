@@ -318,6 +318,17 @@ impl<'a> Status<'a> {
 #[cfg_attr(feature = "serde", serde(tag = "type", content = "content"))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToStatic)]
 pub enum Data<'a> {
+    ESearch {
+        tag: Option<crate::core::AString<'a>>,
+        uid: bool,
+        items: Vec<crate::rev2::SearchReturnData<'a>>,
+    },
+    ListExtended {
+        items: Vec<FlagNameAttribute<'a>>,
+        delimiter: Option<QuotedChar>,
+        mailbox: Mailbox<'a>,
+        extensions: Vec<crate::rev2::ListExtension<'a>>,
+    },
     // ## 7.2. Server Responses - Server and Mailbox Status
     //
     // These responses are always untagged.  This is how server and mailbox
@@ -1057,6 +1068,7 @@ impl<'a> CodeOther<'a> {
 #[non_exhaustive]
 pub enum Capability<'a> {
     Imap4Rev1,
+    Imap4Rev2,
     Auth(AuthMechanism<'a>),
     LoginDisabled,
     #[cfg(feature = "starttls")]
@@ -1125,6 +1137,7 @@ impl Display for Capability<'_> {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self {
             Self::Imap4Rev1 => write!(f, "IMAP4REV1"),
+            Self::Imap4Rev2 => write!(f, "IMAP4REV2"),
             Self::Auth(mechanism) => write!(f, "AUTH={mechanism}"),
             Self::LoginDisabled => write!(f, "LOGINDISABLED"),
             #[cfg(feature = "starttls")]
@@ -1202,6 +1215,7 @@ impl<'a> From<Atom<'a>> for Capability<'a> {
 
         match cow.to_ascii_lowercase().as_ref() {
             "imap4rev1" => Self::Imap4Rev1,
+            "imap4rev2" => Self::Imap4Rev2,
             "logindisabled" => Self::LoginDisabled,
             #[cfg(feature = "starttls")]
             "starttls" => Self::StartTls,
@@ -1321,10 +1335,7 @@ mod tests {
 
     #[test]
     fn test_conversion_continue_failing() {
-        let tests = [
-            CommandContinuationRequest::basic(None, ""),
-            CommandContinuationRequest::basic(Some(Code::ReadWrite), ""),
-        ];
+        let tests = [CommandContinuationRequest::basic(None, "")];
 
         for test in tests {
             println!("{test:?}");

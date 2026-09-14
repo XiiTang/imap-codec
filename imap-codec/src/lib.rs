@@ -137,6 +137,7 @@ mod status;
 #[cfg(test)]
 mod testing;
 
+pub mod client_capabilities;
 pub mod fragmentizer;
 #[cfg(feature = "fuzz")]
 pub mod fuzz {

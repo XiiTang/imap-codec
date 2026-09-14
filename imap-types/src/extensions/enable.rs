@@ -39,6 +39,9 @@ impl<'a> CommandBody<'a> {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToStatic)]
 #[non_exhaustive]
 pub enum CapabilityEnable<'a> {
+    Imap4Rev2,
+    #[cfg(feature = "ext_condstore_qresync")]
+    QResync,
     #[cfg(feature = "ext_condstore_qresync")]
     #[cfg_attr(docsrs, doc(cfg(feature = "ext_condstore_qresync")))]
     CondStore,
@@ -64,6 +67,9 @@ impl<'a> TryFrom<&'a str> for CapabilityEnable<'a> {
 impl<'a> From<Atom<'a>> for CapabilityEnable<'a> {
     fn from(atom: Atom<'a>) -> Self {
         match atom.as_ref().to_ascii_lowercase().as_str() {
+            "imap4rev2" => Self::Imap4Rev2,
+            #[cfg(feature = "ext_condstore_qresync")]
+            "qresync" => Self::QResync,
             #[cfg(feature = "ext_condstore_qresync")]
             "condstore" => Self::CondStore,
             #[cfg(feature = "ext_metadata")]
@@ -82,6 +88,9 @@ impl<'a> From<Atom<'a>> for CapabilityEnable<'a> {
 impl Display for CapabilityEnable<'_> {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         match self {
+            Self::Imap4Rev2 => write!(f, "IMAP4rev2"),
+            #[cfg(feature = "ext_condstore_qresync")]
+            Self::QResync => write!(f, "QRESYNC"),
             #[cfg(feature = "ext_condstore_qresync")]
             Self::CondStore => write!(f, "CONDSTORE"),
             #[cfg(feature = "ext_metadata")]

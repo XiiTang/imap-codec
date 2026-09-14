@@ -1249,17 +1249,20 @@ impl<'a> Text<'a> {
     pub fn validate(value: impl AsRef<[u8]>) -> Result<(), ValidationError> {
         let value = value.as_ref();
 
-        if value.is_empty() {
-            return Err(ValidationError::new(ValidationErrorKind::Empty));
-        }
-
-        if let Some(at) = value.iter().position(|b| !is_text_char(*b)) {
+        if let Some(at) = value.iter().position(|b| !is_text_char(*b) && *b < 0x80) {
             return Err(ValidationError::new(ValidationErrorKind::InvalidByteAt {
                 byte: value[at],
                 at,
             }));
         };
 
+        if let Err(error) = std::str::from_utf8(value) {
+            let at = error.valid_up_to();
+            return Err(ValidationError::new(ValidationErrorKind::InvalidByteAt {
+                byte: value[at],
+                at,
+            }));
+        }
         Ok(())
     }
 

@@ -22,6 +22,7 @@ use crate::{
 ///               "UNSEEN"`
 pub(crate) fn status_att(input: &[u8]) -> IMAPResult<&[u8], StatusDataItemName> {
     alt((
+        value(StatusDataItemName::Size, tag_no_case(b"SIZE")),
         value(StatusDataItemName::Messages, tag_no_case(b"MESSAGES")),
         value(StatusDataItemName::Recent, tag_no_case(b"RECENT")),
         value(StatusDataItemName::UidNext, tag_no_case(b"UIDNEXT")),
@@ -59,6 +60,10 @@ pub(crate) fn status_att_list(input: &[u8]) -> IMAPResult<&[u8], Vec<StatusDataI
 /// Note: See errata id: 261
 fn status_att_val(input: &[u8]) -> IMAPResult<&[u8], StatusDataItem> {
     alt((
+        map(
+            preceded(tag_no_case(b"SIZE "), crate::extensions::rev2::number63),
+            StatusDataItem::Size,
+        ),
         map(
             preceded(tag_no_case(b"MESSAGES "), number),
             StatusDataItem::Messages,

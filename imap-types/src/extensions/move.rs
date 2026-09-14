@@ -19,7 +19,9 @@ impl<'a> CommandBody<'a> {
         M: TryInto<Mailbox<'a>>,
     {
         Ok(CommandBody::Move {
-            sequence_set: sequence_set.try_into().map_err(MoveError::Sequence)?,
+            sequence_set: crate::rev2::MessageSet::from(
+                sequence_set.try_into().map_err(MoveError::Sequence)?,
+            ),
             mailbox: mailbox.try_into().map_err(MoveError::Mailbox)?,
             uid,
         })

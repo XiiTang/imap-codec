@@ -15,7 +15,7 @@ use nom::{
 #[cfg(feature = "ext_condstore_qresync")]
 use crate::extensions::condstore_qresync::search_modsequence;
 use crate::{
-    core::{astring, atom, charset, number},
+    core::{astring, atom, charset},
     datetime::date,
     decode::{IMAPErrorKind, IMAPParseError, IMAPResult},
     fetch::header_fld_name,
@@ -28,6 +28,9 @@ use crate::{
 ///
 /// errata id: 261
 pub(crate) fn search(input: &[u8]) -> IMAPResult<&[u8], CommandBody> {
+    alt((crate::extensions::rev2::extended_search, legacy_search))(input)
+}
+fn legacy_search(input: &[u8]) -> IMAPResult<&[u8], CommandBody> {
     let mut parser = tuple((
         tag_no_case(b"SEARCH"),
         opt(map(
@@ -108,6 +111,12 @@ fn search_key_limited(input: &[u8], remaining_recursion: usize) -> IMAPResult<&[
         }));
     }
 
+    if let Ok((rest, _)) = tag::<_, _, crate::decode::IMAPParseError<_>>(b"$")(input) {
+        return Ok((rest, SearchKey::SearchResult));
+    }
+    if let Ok((rest, _)) = tag_no_case::<_, _, crate::decode::IMAPParseError<_>>(b"UID $")(input) {
+        return Ok((rest, SearchKey::UidSearchResult));
+    }
     let search_key = |input| search_key_limited(input, remaining_recursion.saturating_sub(1));
 
     alt((
@@ -180,7 +189,11 @@ fn search_key_limited(input: &[u8], remaining_recursion: usize) -> IMAPResult<&[
                 |(_, _, key, _, val)| SearchKey::Header(key, val),
             ),
             map(
-                tuple((tag_no_case(b"LARGER"), sp, number)),
+                tuple((
+                    tag_no_case(b"LARGER"),
+                    sp,
+                    crate::extensions::rev2::number63,
+                )),
                 |(_, _, val)| SearchKey::Larger(val),
             ),
             map(
@@ -204,7 +217,11 @@ fn search_key_limited(input: &[u8], remaining_recursion: usize) -> IMAPResult<&[
                 |(_, _, date)| SearchKey::SentSince(date),
             ),
             map(
-                tuple((tag_no_case(b"SMALLER"), sp, number)),
+                tuple((
+                    tag_no_case(b"SMALLER"),
+                    sp,
+                    crate::extensions::rev2::number63,
+                )),
                 |(_, _, val)| SearchKey::Smaller(val),
             ),
             map(

@@ -747,6 +747,12 @@ pub enum CommandBody<'a> {
     /// criteria for omitting INBOX is whether SELECT INBOX will return
     /// failure; it is not relevant whether the user's real INBOX resides
     /// on this or some other server.
+    ListExtended {
+        selection: Vec<crate::core::Atom<'a>>,
+        reference: Mailbox<'a>,
+        patterns: Vec1<ListMailbox<'a>>,
+        returns: Option<Vec<crate::rev2::ListReturn<'a>>>,
+    },
     List {
         /// Reference.
         reference: Mailbox<'a>,
@@ -1008,7 +1014,9 @@ pub enum CommandBody<'a> {
     ///
     /// Alternatively, the client may fall back to using just the EXPUNGE
     /// command, risking the unintended removal of some messages.
-    ExpungeUid { sequence_set: SequenceSet },
+    ExpungeUid {
+        sequence_set: crate::rev2::MessageSet,
+    },
 
     /// ### 6.4.4.  SEARCH Command
     ///
@@ -1062,6 +1070,12 @@ pub enum CommandBody<'a> {
     /// text, it is not possible to show actual UTF-8 data.  The
     /// "XXXXXX" is a placeholder for what would be 6 octets of
     /// 8-bit data in an actual transaction.
+    SearchExtended {
+        returns: Vec<crate::rev2::SearchReturn<'a>>,
+        charset: Option<Charset<'a>>,
+        criteria: Vec1<SearchKey<'a>>,
+        uid: bool,
+    },
     Search {
         /// Charset.
         charset: Option<Charset<'a>>,
@@ -1149,7 +1163,7 @@ pub enum CommandBody<'a> {
     ///   safely ignore the newly transmitted envelope.
     Fetch {
         /// Set of messages.
-        sequence_set: SequenceSet,
+        sequence_set: crate::rev2::MessageSet,
         /// Message data items (or a macro).
         macro_or_item_names: MacroOrMessageDataItemNames<'a>,
         /// Use UID variant.
@@ -1210,7 +1224,7 @@ pub enum CommandBody<'a> {
     ///    Equivalent to -FLAGS, but without returning a new value.
     Store {
         /// Set of messages.
-        sequence_set: SequenceSet,
+        sequence_set: crate::rev2::MessageSet,
         /// Kind of storage, i.e., replace, add, or remove.
         kind: StoreType,
         /// Kind of response, i.e., answer or silent.
@@ -1252,7 +1266,7 @@ pub enum CommandBody<'a> {
     /// before the COPY attempt.
     Copy {
         /// Set of messages.
-        sequence_set: SequenceSet,
+        sequence_set: crate::rev2::MessageSet,
         /// Destination mailbox.
         mailbox: Mailbox<'a>,
         /// Use UID variant.
@@ -1496,7 +1510,7 @@ pub enum CommandBody<'a> {
     /// </div>
     Move {
         /// Set of messages.
-        sequence_set: SequenceSet,
+        sequence_set: crate::rev2::MessageSet,
         /// Destination mailbox.
         mailbox: Mailbox<'a>,
         /// Use UID variant.
@@ -1750,7 +1764,7 @@ impl<'a> CommandBody<'a> {
         S: TryInto<SequenceSet>,
         I: Into<MacroOrMessageDataItemNames<'a>>,
     {
-        let sequence_set = sequence_set.try_into()?;
+        let sequence_set = crate::rev2::MessageSet::from(sequence_set.try_into()?);
 
         Ok(CommandBody::Fetch {
             sequence_set,
@@ -1772,7 +1786,7 @@ impl<'a> CommandBody<'a> {
     where
         S: TryInto<SequenceSet>,
     {
-        let sequence_set = sequence_set.try_into()?;
+        let sequence_set = crate::rev2::MessageSet::from(sequence_set.try_into()?);
 
         Ok(CommandBody::Store {
             sequence_set,
@@ -1796,7 +1810,9 @@ impl<'a> CommandBody<'a> {
         M: TryInto<Mailbox<'a>>,
     {
         Ok(CommandBody::Copy {
-            sequence_set: sequence_set.try_into().map_err(CopyError::Sequence)?,
+            sequence_set: crate::rev2::MessageSet::from(
+                sequence_set.try_into().map_err(CopyError::Sequence)?,
+            ),
             mailbox: mailbox.try_into().map_err(CopyError::Mailbox)?,
             uid,
         })
@@ -1822,7 +1838,7 @@ impl<'a> CommandBody<'a> {
             Self::Rename { .. } => "RENAME",
             Self::Subscribe { .. } => "SUBSCRIBE",
             Self::Unsubscribe { .. } => "UNSUBSCRIBE",
-            Self::List { .. } => "LIST",
+            Self::ListExtended { .. } | Self::List { .. } => "LIST",
             Self::Lsub { .. } => "LSUB",
             Self::Status { .. } => "STATUS",
             Self::Append { .. } => "APPEND",
@@ -1830,7 +1846,7 @@ impl<'a> CommandBody<'a> {
             Self::Close => "CLOSE",
             Self::Expunge => "EXPUNGE",
             Self::ExpungeUid { .. } => "EXPUNGE",
-            Self::Search { .. } => "SEARCH",
+            Self::SearchExtended { .. } | Self::Search { .. } => "SEARCH",
             Self::Fetch { .. } => "FETCH",
             Self::Store { .. } => "STORE",
             Self::Copy { .. } => "COPY",
@@ -2260,7 +2276,7 @@ mod tests {
             ),
             (
                 CommandBody::Fetch {
-                    sequence_set: SequenceSet::try_from(1u32).unwrap(),
+                    sequence_set: crate::rev2::MessageSet::try_from(1u32).unwrap(),
                     macro_or_item_names: MacroOrMessageDataItemNames::Macro(Macro::Full),
                     uid: true,
                     #[cfg(feature = "ext_condstore_qresync")]
@@ -2270,7 +2286,7 @@ mod tests {
             ),
             (
                 CommandBody::Store {
-                    sequence_set: SequenceSet::try_from(1).unwrap(),
+                    sequence_set: crate::rev2::MessageSet::try_from(1).unwrap(),
                     flags: vec![],
                     response: StoreResponse::Silent,
                     kind: StoreType::Add,
@@ -2282,7 +2298,7 @@ mod tests {
             ),
             (
                 CommandBody::Copy {
-                    sequence_set: SequenceSet::try_from(1).unwrap(),
+                    sequence_set: crate::rev2::MessageSet::try_from(1).unwrap(),
                     mailbox: Mailbox::Inbox,
                     uid: true,
                 },
@@ -2323,7 +2339,7 @@ mod tests {
             ),
             (
                 CommandBody::Move {
-                    sequence_set: SequenceSet::try_from(1).unwrap(),
+                    sequence_set: crate::rev2::MessageSet::try_from(1).unwrap(),
                     mailbox: Mailbox::Inbox,
                     uid: true,
                 },

@@ -385,6 +385,18 @@ impl EncodeIntoContext for CommandBody<'_> {
                 ctx.write_all(b"UNSUBSCRIBE ")?;
                 mailbox.encode_ctx(ctx)
             }
+            CommandBody::ListExtended {
+                selection,
+                reference,
+                patterns,
+                returns,
+            } => crate::extensions::rev2::encode_list(selection, reference, patterns, returns, ctx),
+            CommandBody::SearchExtended {
+                returns,
+                charset,
+                criteria,
+                uid,
+            } => crate::extensions::rev2::encode_search(returns, charset, criteria, *uid, ctx),
             CommandBody::List {
                 reference,
                 mailbox_wildcard,
@@ -852,6 +864,7 @@ impl EncodeIntoContext for ListCharString<'_> {
 impl EncodeIntoContext for StatusDataItemName {
     fn encode_ctx(&self, ctx: &mut EncodeContext) -> std::io::Result<()> {
         match self {
+            Self::Size => ctx.write_all(b"SIZE"),
             Self::Messages => ctx.write_all(b"MESSAGES"),
             Self::Recent => ctx.write_all(b"RECENT"),
             Self::UidNext => ctx.write_all(b"UIDNEXT"),
@@ -907,6 +920,8 @@ impl EncodeIntoContext for Charset<'_> {
 impl EncodeIntoContext for SearchKey<'_> {
     fn encode_ctx(&self, ctx: &mut EncodeContext) -> std::io::Result<()> {
         match self {
+            SearchKey::SearchResult => ctx.write_all(b"$"),
+            SearchKey::UidSearchResult => ctx.write_all(b"UID $"),
             SearchKey::All => ctx.write_all(b"ALL"),
             SearchKey::Answered => ctx.write_all(b"ANSWERED"),
             SearchKey::Bcc(astring) => {
@@ -1431,6 +1446,19 @@ impl EncodeIntoContext for Text<'_> {
 impl EncodeIntoContext for Data<'_> {
     fn encode_ctx(&self, ctx: &mut EncodeContext) -> std::io::Result<()> {
         match self {
+            Data::ESearch { tag, uid, items } => {
+                crate::extensions::rev2::encode_esearch(tag, *uid, items, ctx)?;
+            }
+            Data::ListExtended {
+                items,
+                delimiter,
+                mailbox,
+                extensions,
+            } => {
+                crate::extensions::rev2::encode_list_data(
+                    items, delimiter, mailbox, extensions, ctx,
+                )?;
+            }
             Data::Capability(caps) => {
                 ctx.write_all(b"* CAPABILITY ")?;
                 join_serializable(caps.as_ref(), b" ", ctx)?;
@@ -1672,6 +1700,7 @@ impl EncodeIntoContext for QuotedChar {
 impl EncodeIntoContext for StatusDataItem {
     fn encode_ctx(&self, ctx: &mut EncodeContext) -> std::io::Result<()> {
         match self {
+            Self::Size(value) => write!(ctx, "SIZE {value}"),
             Self::Messages(count) => {
                 ctx.write_all(b"MESSAGES ")?;
                 count.encode_ctx(ctx)

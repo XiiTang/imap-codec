@@ -43,7 +43,7 @@ pub struct BasicFields<'a> {
     ///
     /// Note that this size is the size in its transfer encoding
     /// and not the resulting size after any decoding.
-    pub size: u32,
+    pub size: u64,
 }
 
 /// Specific fields of a non-multipart body part.
@@ -128,7 +128,7 @@ pub enum SpecificFields<'a> {
         /// body structure,
         body_structure: Box<BodyStructure<'a>>,
         /// and size in text lines of the encapsulated message.
-        number_of_lines: u32,
+        number_of_lines: u64,
     },
 
     /// # Example (not in RFC)
@@ -161,7 +161,7 @@ pub enum SpecificFields<'a> {
         /// Subtype.
         subtype: IString<'a>,
         /// Size of the body in text lines.
-        number_of_lines: u32,
+        number_of_lines: u64,
     },
 }
 

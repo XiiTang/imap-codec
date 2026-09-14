@@ -198,6 +198,7 @@ pub mod fetch;
 pub mod flag;
 pub mod mailbox;
 pub mod response;
+pub mod rev2;
 pub mod search;
 pub mod secret;
 pub mod sequence;

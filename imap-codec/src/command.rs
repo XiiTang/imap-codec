@@ -45,6 +45,7 @@ use crate::{
     core::{astring, base64, literal, tag_imap},
     datetime::date_time,
     decode::{IMAPErrorKind, IMAPResult},
+    extensions::rev2::message_set,
     extensions::{
         binary::literal8,
         compress::compress,
@@ -251,17 +252,7 @@ pub(crate) fn examine(input: &[u8]) -> IMAPResult<&[u8], CommandBody> {
 
 /// `list = "LIST" SP mailbox SP list-mailbox`
 pub(crate) fn list(input: &[u8]) -> IMAPResult<&[u8], CommandBody> {
-    let mut parser = tuple((tag_no_case(b"LIST "), mailbox, sp, list_mailbox));
-
-    let (remaining, (_, reference, _, mailbox_wildcard)) = parser(input)?;
-
-    Ok((
-        remaining,
-        CommandBody::List {
-            reference,
-            mailbox_wildcard,
-        },
-    ))
+    crate::extensions::rev2::list(input)
 }
 
 /// `lsub = "LSUB" SP mailbox SP list-mailbox`
@@ -563,7 +554,7 @@ pub(crate) fn command_select(input: &[u8]) -> IMAPResult<&[u8], CommandBody> {
 
 /// `copy = "COPY" SP sequence-set SP mailbox`
 pub(crate) fn copy(input: &[u8]) -> IMAPResult<&[u8], CommandBody> {
-    let mut parser = tuple((tag_no_case(b"COPY"), sp, sequence_set, sp, mailbox));
+    let mut parser = tuple((tag_no_case(b"COPY"), sp, message_set, sp, mailbox));
 
     let (remaining, (_, _, sequence_set, _, mailbox)) = parser(input)?;
 
@@ -587,7 +578,7 @@ pub(crate) fn copy(input: &[u8]) -> IMAPResult<&[u8], CommandBody> {
 pub(crate) fn fetch(input: &[u8]) -> IMAPResult<&[u8], CommandBody> {
     let mut parser = tuple((
         tag_no_case(b"FETCH"),
-        preceded(sp, sequence_set),
+        preceded(sp, message_set),
         preceded(
             sp,
             alt((
@@ -689,7 +680,7 @@ pub(crate) fn fetch_modifier(input: &[u8]) -> IMAPResult<&[u8], FetchModifier> {
 pub(crate) fn store(input: &[u8]) -> IMAPResult<&[u8], CommandBody> {
     let mut parser = tuple((
         tag_no_case(b"STORE"),
-        preceded(sp, sequence_set),
+        preceded(sp, message_set),
         #[cfg(feature = "ext_condstore_qresync")]
         map(opt(store_modifiers), Option::unwrap_or_default),
         preceded(sp, store_att_flags),
@@ -796,6 +787,7 @@ pub(crate) fn uid(input: &[u8]) -> IMAPResult<&[u8], CommandBody> {
         CommandBody::Copy { ref mut uid, .. }
         | CommandBody::Fetch { ref mut uid, .. }
         | CommandBody::Search { ref mut uid, .. }
+        | CommandBody::SearchExtended { ref mut uid, .. }
         | CommandBody::Store { ref mut uid, .. }
         | CommandBody::Move { ref mut uid, .. } => *uid = true,
         _ => unreachable!(),
@@ -806,7 +798,6 @@ pub(crate) fn uid(input: &[u8]) -> IMAPResult<&[u8], CommandBody> {
 
 #[cfg(test)]
 mod tests {
-    use std::num::NonZeroU32;
 
     use imap_types::{
         core::Tag,
@@ -860,7 +851,7 @@ mod tests {
             ),
             (
                 MessageDataItemName::BodyExt {
-                    partial: Some((42, NonZeroU32::try_from(1337).unwrap())),
+                    partial: Some((42, 1337.try_into().unwrap())),
                     peek: true,
                     section: Some(Section::Text(None)),
                 },

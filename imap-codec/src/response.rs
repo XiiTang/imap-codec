@@ -12,8 +12,6 @@ use imap_types::{
         Response, Status, StatusBody, StatusKind, Tagged,
     },
 };
-#[cfg(feature = "quirk_missing_text")]
-use nom::combinator::peek;
 use nom::{
     branch::alt,
     bytes::streaming::{tag, tag_no_case, take_until, take_while},
@@ -102,16 +100,9 @@ pub(crate) fn resp_text(input: &[u8]) -> IMAPResult<&[u8], (Option<Code>, Text)>
                     Some,
                 ),
             ),
-            #[cfg(not(feature = "quirk_missing_text"))]
-            preceded(sp, text),
-            #[cfg(feature = "quirk_missing_text")]
             alt((
                 preceded(sp, text),
-                map(peek(crlf), |_| {
-                    log::warn!("Rectified missing `text` to \"...\"");
-
-                    Text::unvalidated("...")
-                }),
+                map(nom::combinator::peek(crlf), |_| Text::unvalidated("")),
             )),
         ))(input)
     } else {
@@ -341,6 +332,8 @@ pub(crate) fn response_data(input: &[u8]) -> IMAPResult<&[u8], Response> {
             map(resp_cond_bye, |(code, text)| {
                 Response::Status(Status::Bye(Bye { code, text }))
             }),
+            map(crate::extensions::rev2::esearch, Response::Data),
+            map(crate::extensions::rev2::list_data, Response::Data),
             map(mailbox_data, Response::Data),
             map(message_data, Response::Data),
             map(capability_data, |caps| {
@@ -803,20 +796,13 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_resp_text_quirk() {
-        #[cfg(not(feature = "quirk_missing_text"))]
-        {
-            assert!(resp_text(b"[IMAP4rev1]\r\n").is_err());
-            assert!(resp_text(b"[IMAP4rev1]\r\n").is_err());
-            assert!(resp_text(b"[IMAP4rev1] \r\n").is_err());
-            assert!(resp_text(b"[IMAP4rev1]  \r\n").is_ok());
-        }
-
-        #[cfg(feature = "quirk_missing_text")]
-        {
-            assert!(resp_text(b"[IMAP4rev1]\r\n").is_ok());
-            assert!(resp_text(b"[IMAP4rev1] \r\n").is_err());
-            assert!(resp_text(b"[IMAP4rev1]  \r\n").is_ok());
+    fn test_parse_empty_rev2_response_text() {
+        for bytes in [
+            b"[IMAP4rev1]\r\n".as_slice(),
+            b"[IMAP4rev1] \r\n",
+            b"[IMAP4rev1]  \r\n",
+        ] {
+            assert!(resp_text(bytes).is_ok());
         }
     }
 

@@ -250,12 +250,10 @@ pub(crate) fn nil(input: &[u8]) -> IMAPResult<&[u8], &[u8]> {
 
 /// `text = 1*TEXT-CHAR`
 pub(crate) fn text(input: &[u8]) -> IMAPResult<&[u8], Text> {
-    map(take_while1(is_text_char), |bytes|
-        // # Safety
-        // 
-        // `is_text_char` makes sure that the sequence of bytes
-        // is always valid ASCII. Thus, it is also valid UTF-8.
-        Text::unvalidated(from_utf8(bytes).unwrap()))(input)
+    map(
+        map_res(take_while(|b| is_text_char(b) || b >= 0x80), from_utf8),
+        Text::unvalidated,
+    )(input)
 }
 
 // ----- base64 -----

@@ -18,7 +18,7 @@ use nom::{
 use crate::extensions::condstore_qresync::mod_sequence_value;
 use crate::{
     body::body,
-    core::{astring, nstring, number, nz_number},
+    core::{astring, nstring, nz_number},
     datetime::date_time,
     decode::IMAPResult,
     envelope::envelope,
@@ -58,7 +58,11 @@ pub(crate) fn fetch_att(input: &[u8]) -> IMAPResult<&[u8], MessageDataItemName> 
                 section,
                 opt(delimited(
                     tag(b"<"),
-                    tuple((number, tag(b"."), nz_number)),
+                    tuple((
+                        crate::extensions::rev2::number63,
+                        tag(b"."),
+                        crate::extensions::rev2::nz_number63,
+                    )),
                     tag(b">"),
                 )),
             )),
@@ -74,7 +78,11 @@ pub(crate) fn fetch_att(input: &[u8]) -> IMAPResult<&[u8], MessageDataItemName> 
                 section,
                 opt(delimited(
                     tag(b"<"),
-                    tuple((number, tag(b"."), nz_number)),
+                    tuple((
+                        crate::extensions::rev2::number63,
+                        tag(b"."),
+                        crate::extensions::rev2::nz_number63,
+                    )),
                     tag(b">"),
                 )),
             )),
@@ -199,7 +207,10 @@ pub(crate) fn msg_att_static(input: &[u8]) -> IMAPResult<&[u8], MessageDataItem>
             MessageDataItem::Rfc822Text,
         ),
         map(
-            preceded(tag_no_case(b"RFC822.SIZE "), number),
+            preceded(
+                tag_no_case(b"RFC822.SIZE "),
+                crate::extensions::rev2::number63,
+            ),
             MessageDataItem::Rfc822Size,
         ),
         map(
@@ -218,7 +229,11 @@ pub(crate) fn msg_att_static(input: &[u8]) -> IMAPResult<&[u8], MessageDataItem>
             tuple((
                 tag_no_case(b"BODY"),
                 section,
-                opt(delimited(tag(b"<"), number, tag(b">"))),
+                opt(delimited(
+                    tag(b"<"),
+                    crate::extensions::rev2::number63,
+                    tag(b">"),
+                )),
                 sp,
                 nstring,
             )),
@@ -245,7 +260,12 @@ pub(crate) fn msg_att_static(input: &[u8]) -> IMAPResult<&[u8], MessageDataItem>
             |(_, section, _, value)| MessageDataItem::Binary { section, value },
         ),
         map(
-            tuple((tag_no_case(b"BINARY.SIZE"), section_binary, sp, number)),
+            tuple((
+                tag_no_case(b"BINARY.SIZE"),
+                section_binary,
+                sp,
+                crate::extensions::rev2::number63,
+            )),
             |(_, section, _, size)| MessageDataItem::BinarySize { section, size },
         ),
     ))(input)

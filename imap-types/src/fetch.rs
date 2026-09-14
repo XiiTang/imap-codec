@@ -139,7 +139,7 @@ pub enum MessageDataItemName<'a> {
         ///    Note: A substring fetch of a HEADER.FIELDS or
         ///    HEADER.FIELDS.NOT part specifier is calculated after
         ///    subsetting the header.
-        partial: Option<(u32, NonZeroU32)>,
+        partial: Option<(u64, std::num::NonZeroU64)>,
         /// Defines, wheather BODY or BODY.PEEK should be used.
         ///
         /// `BODY[...]` implicitly sets the `\Seen` flag where `BODY.PEEK[...]` does not.
@@ -233,7 +233,7 @@ pub enum MessageDataItemName<'a> {
 
     Binary {
         section: Vec<NonZeroU32>,
-        partial: Option<(u32, NonZeroU32)>,
+        partial: Option<(u64, std::num::NonZeroU64)>,
         peek: bool,
     },
 
@@ -292,7 +292,7 @@ pub enum MessageDataItem<'a> {
         ///    in a FETCH response unless the client specifically requested
         ///    it by means of a FETCH of a `BODY[<section>]<<partial>>` data
         ///    item.
-        origin: Option<u32>,
+        origin: Option<u64>,
         /// The string SHOULD be interpreted by the client according to the
         /// content transfer encoding, body type, and subtype.
         data: NString<'a>,
@@ -356,7 +356,7 @@ pub enum MessageDataItem<'a> {
     /// ```imap
     /// RFC822.SIZE
     /// ```
-    Rfc822Size(u32),
+    Rfc822Size(u64),
 
     /// Equivalent to `BODY[TEXT]`.
     ///
@@ -379,7 +379,7 @@ pub enum MessageDataItem<'a> {
 
     BinarySize {
         section: Vec<NonZeroU32>,
-        size: u32,
+        size: u64,
     },
 
     #[cfg(feature = "ext_condstore_qresync")]

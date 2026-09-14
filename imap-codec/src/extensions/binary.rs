@@ -16,7 +16,7 @@ use nom::{
 };
 
 use crate::{
-    core::{number, nz_number},
+    core::number,
     decode::{IMAPErrorKind, IMAPParseError, IMAPResult},
     encode::{EncodeContext, EncodeIntoContext},
     fetch::section_part,
@@ -110,10 +110,14 @@ pub(crate) fn section_binary(input: &[u8]) -> IMAPResult<&[u8], Vec<NonZeroU32>>
 /// ```abnf
 /// partial = "<" number "." nz-number ">"
 /// ```
-pub(crate) fn partial(input: &[u8]) -> IMAPResult<&[u8], (u32, NonZeroU32)> {
+pub(crate) fn partial(input: &[u8]) -> IMAPResult<&[u8], (u64, std::num::NonZeroU64)> {
     delimited(
         tag(b"<"),
-        separated_pair(number, tag(b"."), nz_number),
+        separated_pair(
+            crate::extensions::rev2::number63,
+            tag(b"."),
+            crate::extensions::rev2::nz_number63,
+        ),
         tag(b">"),
     )(input)
 }
