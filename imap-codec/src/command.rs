@@ -40,6 +40,8 @@ use crate::extensions::id::id;
 use crate::extensions::metadata::{getmetadata, setmetadata};
 #[cfg(feature = "ext_namespace")]
 use crate::extensions::namespace::namespace_command;
+#[cfg(feature = "ext_condstore_qresync")]
+use crate::sequence::sequence_set;
 use crate::{
     auth::auth_type,
     core::{astring, base64, literal, tag_imap},
@@ -61,7 +63,6 @@ use crate::{
     flag::{flag, flag_list},
     mailbox::{list_mailbox, mailbox},
     search::search,
-    sequence::sequence_set,
     status::status_att,
 };
 

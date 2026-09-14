@@ -42,6 +42,9 @@
 //! }
 //! # }
 //! ```
+mod streaming;
+pub use streaming::*;
+
 use std::{collections::VecDeque, ops::Range};
 
 use imap_types::{
@@ -376,7 +379,7 @@ impl LineParser {
                     }
                     b'{' => LatestByte::OpeningBracket,
                     b'0'..=b'9' => {
-                        let digit = (next_byte - b'0') as u32;
+                        let digit = (next_byte - b'0') as u64;
                         LatestByte::Digit { length: digit }
                     }
                     _ => LatestByte::Other,
@@ -414,11 +417,14 @@ impl LineParser {
                     }
                     b'{' => LatestByte::OpeningBracket,
                     b'0'..=b'9' => {
-                        let digit = (next_byte - b'0') as u32;
+                        let digit = (next_byte - b'0') as u64;
                         let new_length = length.checked_mul(10).and_then(|x| x.checked_add(digit));
                         match new_length {
                             None => LatestByte::Other,
-                            Some(length) => LatestByte::Digit { length },
+                            Some(length) if length <= i64::MAX as u64 => {
+                                LatestByte::Digit { length }
+                            }
+                            Some(_) => LatestByte::Other,
                         }
                     }
                     b'+' => LatestByte::Plus { length },
@@ -478,10 +484,10 @@ enum LatestByte {
     Other,
     OpeningBracket,
     Digit {
-        length: u32,
+        length: u64,
     },
     Plus {
-        length: u32,
+        length: u64,
     },
     ClosingBracket {
         announcement: LiteralAnnouncement,
@@ -499,11 +505,11 @@ struct LiteralParser {
     /// Until where we parsed the literal.
     end: usize,
     /// Remaining bytes we need to parse.
-    remaining: u32,
+    remaining: u64,
 }
 
 impl LiteralParser {
-    fn new(start: usize, length: u32) -> Self {
+    fn new(start: usize, length: u64) -> Self {
         Self {
             start,
             end: start,
@@ -512,11 +518,11 @@ impl LiteralParser {
     }
 
     fn parse(&mut self, unprocessed_bytes: &VecDeque<u8>) -> (usize, Option<FragmentInfo>) {
-        if unprocessed_bytes.len() < self.remaining as usize {
+        if (unprocessed_bytes.len() as u64) < self.remaining {
             // Not enough bytes yet
             let parsed_byte_count = unprocessed_bytes.len();
             self.end += parsed_byte_count;
-            self.remaining -= parsed_byte_count as u32;
+            self.remaining -= parsed_byte_count as u64;
             (parsed_byte_count, None)
         } else {
             // There are enough bytes
@@ -575,7 +581,7 @@ pub struct LiteralAnnouncement {
     /// The mode of the announced literal.
     pub mode: LiteralMode,
     /// The length of the announced literal in bytes.
-    pub length: u32,
+    pub length: u64,
 }
 
 /// The character sequence used for ending a line.
@@ -1558,7 +1564,7 @@ mod tests {
             }),
             LineEnding::CrLf,
         );
-        assert_is_line(b"foo {4294967296}\r\n", 18, None, LineEnding::CrLf);
+        assert_is_line(b"foo {9223372036854775808}\r\n", 27, None, LineEnding::CrLf);
     }
 
     #[test]

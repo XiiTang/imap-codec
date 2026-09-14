@@ -438,7 +438,6 @@ pub(crate) fn encode_list_data(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::{CommandCodec, ResponseCodec, decode::Decoder, encode::Encoder};
     #[test]
     fn rev2_commands_survive_every_fragment_boundary_and_roundtrip() {

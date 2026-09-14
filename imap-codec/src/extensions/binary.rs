@@ -16,7 +16,6 @@ use nom::{
 };
 
 use crate::{
-    core::number,
     decode::{IMAPErrorKind, IMAPParseError, IMAPResult},
     encode::{EncodeContext, EncodeIntoContext},
     fetch::section_part,
@@ -34,7 +33,7 @@ pub(crate) fn literal8(input: &[u8]) -> IMAPResult<&[u8], Literal8> {
         delimited(
             tag(b"~{"),
             tuple((
-                number,
+                crate::extensions::rev2::number63,
                 map(opt(char('+')), |i| {
                     i.map(|_| LiteralMode::NonSync).unwrap_or(LiteralMode::Sync)
                 }),
@@ -58,6 +57,12 @@ pub(crate) fn literal8(input: &[u8]) -> IMAPResult<&[u8], Literal8> {
         }));
     }
 
+    let length = usize::try_from(length).map_err(|_| {
+        nom::Err::Failure(IMAPParseError {
+            input,
+            kind: IMAPErrorKind::BadNumber,
+        })
+    })?;
     let (remaining, data) = take(length)(remaining)?;
 
     Ok((
