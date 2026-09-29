@@ -189,6 +189,8 @@ pub(crate) fn resp_text_code(input: &[u8]) -> IMAPResult<&[u8], Code> {
             Code::Metadata,
         ),
         value(Code::UnknownCte, tag_no_case(b"UNKNOWN-CTE")),
+        #[cfg(feature = "ext_urlauth")]
+        crate::extensions::urlauth::code,
         resp_code_apnd,
         resp_code_copy,
         value(Code::UidNotSticky, tag_no_case(b"UIDNOTSTICKY")),
@@ -340,6 +342,8 @@ pub(crate) fn response_data(input: &[u8]) -> IMAPResult<&[u8], Response> {
                 Response::Data(Data::Capability(caps))
             }),
             map(enable_data, Response::Data),
+            #[cfg(feature = "ext_urlauth")]
+            map(crate::extensions::urlauth::response, Response::Data),
             #[cfg(feature = "ext_id")]
             map(id_response, |parameters| {
                 Response::Data(Data::Id { parameters })

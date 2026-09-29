@@ -749,6 +749,29 @@ impl EncodeIntoContext for CommandBody<'_> {
             }
             #[cfg(feature = "ext_namespace")]
             &CommandBody::Namespace => ctx.write_all(b"NAMESPACE"),
+            #[cfg(feature = "ext_urlauth")]
+            CommandBody::GenUrlAuth { requests } => {
+                ctx.write_all(b"GENURLAUTH ")?;
+                join_serializable(requests.as_ref(), b" ", ctx)
+            }
+            #[cfg(feature = "ext_urlauth")]
+            CommandBody::UrlFetch { urls } => {
+                ctx.write_all(b"URLFETCH ")?;
+                join_serializable(urls.as_ref(), b" ", ctx)
+            }
+            #[cfg(feature = "ext_urlauth")]
+            CommandBody::ResetKey { target } => {
+                ctx.write_all(b"RESETKEY")?;
+                if let Some(target) = target {
+                    ctx.write_all(b" ")?;
+                    target.mailbox.encode_ctx(ctx)?;
+                    for mechanism in &target.mechanisms {
+                        ctx.write_all(b" ")?;
+                        mechanism.encode_ctx(ctx)?;
+                    }
+                }
+                Ok(())
+            }
         }
     }
 }
@@ -1473,6 +1496,11 @@ impl EncodeIntoContext for Code<'_> {
                 destination.encode_ctx(ctx)
             }
             Code::UidNotSticky => ctx.write_all(b"UIDNOTSTICKY"),
+            #[cfg(feature = "ext_urlauth")]
+            Code::UrlMech(items) => {
+                ctx.write_all(b"URLMECH ")?;
+                join_serializable(items.as_ref(), b" ", ctx)
+            }
             Code::Other(unknown) => unknown.encode_ctx(ctx),
         }
     }
@@ -1493,6 +1521,16 @@ impl EncodeIntoContext for Text<'_> {
 impl EncodeIntoContext for Data<'_> {
     fn encode_ctx(&self, ctx: &mut EncodeContext) -> std::io::Result<()> {
         match self {
+            #[cfg(feature = "ext_urlauth")]
+            Data::GenUrlAuth { urls } => {
+                ctx.write_all(b"* GENURLAUTH ")?;
+                join_serializable(urls.as_ref(), b" ", ctx)?;
+            }
+            #[cfg(feature = "ext_urlauth")]
+            Data::UrlFetch { results } => {
+                ctx.write_all(b"* URLFETCH ")?;
+                join_serializable(results.as_ref(), b" ", ctx)?;
+            }
             Data::ESearch { tag, uid, items } => {
                 crate::extensions::rev2::encode_esearch(tag, *uid, items, ctx)?;
             }
@@ -2407,10 +2445,26 @@ mod streamed_append_tests {
     #[test]
     fn large_binary_append_encodes_metadata_only_and_gates_real_length() {
         use crate::client_capabilities::{ClientCapabilities, Version};
-        let mut append = StreamedAppend { tag: Tag::try_from("A1").unwrap(), mailbox: Mailbox::Inbox,
-            flags: vec![], date: None, length: i64::MAX as u64, binary: true, mode: LiteralMode::Sync };
-        assert_eq!(append.encode_prefix().unwrap().dump(), b"A1 APPEND INBOX ~{9223372036854775807}\r\n");
-        let caps = ClientCapabilities::new(["IMAP4REV2", "BINARY"].into_iter().map(str::to_owned).collect(), Version::Rev2);
+        let mut append = StreamedAppend {
+            tag: Tag::try_from("A1").unwrap(),
+            mailbox: Mailbox::Inbox,
+            flags: vec![],
+            date: None,
+            length: i64::MAX as u64,
+            binary: true,
+            mode: LiteralMode::Sync,
+        };
+        assert_eq!(
+            append.encode_prefix().unwrap().dump(),
+            b"A1 APPEND INBOX ~{9223372036854775807}\r\n"
+        );
+        let caps = ClientCapabilities::new(
+            ["IMAP4REV2", "BINARY"]
+                .into_iter()
+                .map(str::to_owned)
+                .collect(),
+            Version::Rev2,
+        );
         assert!(caps.validate_streamed_append(&append).is_ok());
         append.mode = LiteralMode::NonSync;
         assert!(caps.validate_streamed_append(&append).is_err());

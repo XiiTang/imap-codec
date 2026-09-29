@@ -18,3 +18,6 @@ pub mod uidplus;
 pub mod unselect;
 #[cfg(feature = "ext_utf8")]
 pub mod utf8;
+
+#[cfg(feature = "ext_urlauth")]
+pub mod urlauth;

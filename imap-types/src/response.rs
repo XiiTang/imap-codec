@@ -318,6 +318,16 @@ impl<'a> Status<'a> {
 #[cfg_attr(feature = "serde", serde(tag = "type", content = "content"))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToStatic)]
 pub enum Data<'a> {
+    /// Generated URLAUTH URLs, in request order.
+    #[cfg(feature = "ext_urlauth")]
+    GenUrlAuth {
+        urls: crate::core::Vec1<crate::extensions::urlauth::UrlAuthUrl>,
+    },
+    /// URL and message-part pairs. NIL is a failed fetch, not an empty part.
+    #[cfg(feature = "ext_urlauth")]
+    UrlFetch {
+        results: crate::core::Vec1<crate::extensions::urlauth::UrlFetchResult<'a>>,
+    },
     ESearch {
         tag: Option<crate::core::AString<'a>>,
         uid: bool,
@@ -794,6 +804,9 @@ impl<'a> CommandContinuationRequestBasic<'a> {
 #[cfg_attr(feature = "serde", serde(tag = "type", content = "content"))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, ToStatic)]
 pub enum Code<'a> {
+    /// Available URLAUTH mechanisms (RFC 4467).
+    #[cfg(feature = "ext_urlauth")]
+    UrlMech(crate::core::Vec1<crate::extensions::urlauth::UrlMech>),
     /// `ALERT`
     ///
     /// The human-readable text contains a special alert that MUST be

@@ -1557,6 +1557,21 @@ pub enum CommandBody<'a> {
     /// This extension must only be used when the server advertised support for it sending the NAMESPACE capability.
     /// </div>
     Namespace,
+    /// Generate URLAUTH authorization tokens (RFC 4467).
+    #[cfg(feature = "ext_urlauth")]
+    GenUrlAuth {
+        requests: crate::core::Vec1<crate::extensions::urlauth::UrlAuthRequest>,
+    },
+    /// Retrieve message parts addressed by IMAP URLs.
+    #[cfg(feature = "ext_urlauth")]
+    UrlFetch {
+        urls: crate::core::Vec1<crate::extensions::urlauth::ImapMessageUrl>,
+    },
+    /// Revoke mailbox URLAUTH keys, or all keys when no target is supplied.
+    #[cfg(feature = "ext_urlauth")]
+    ResetKey {
+        target: Option<crate::extensions::urlauth::ResetKeyTarget<'a>>,
+    },
 }
 
 impl<'a> CommandBody<'a> {
@@ -1865,6 +1880,12 @@ impl<'a> CommandBody<'a> {
             Self::GetMetadata { .. } => "GETMETADATA",
             #[cfg(feature = "ext_namespace")]
             Self::Namespace => "NAMESPACE",
+            #[cfg(feature = "ext_urlauth")]
+            Self::GenUrlAuth { .. } => "GENURLAUTH",
+            #[cfg(feature = "ext_urlauth")]
+            Self::UrlFetch { .. } => "URLFETCH",
+            #[cfg(feature = "ext_urlauth")]
+            Self::ResetKey { .. } => "RESETKEY",
         }
     }
 }

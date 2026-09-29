@@ -27,9 +27,11 @@ ext_login_referrals = []
 ext_mailbox_referrals = []
 ext_metadata = []
 ext_namespace = []
+ext_urlauth = ["dep:url"]
 ext_utf8 = []
 
 [dependencies]
+url = { version = "2.5", optional = true }
 arbitrary = { version = "1.4.2", optional = true, default-features = false, features = ["derive"] }
 base64 = { version = "0.22", default-features = false, features = ["alloc"] }
 bounded-static-derive = { version = "0.8.0", default-features = false }

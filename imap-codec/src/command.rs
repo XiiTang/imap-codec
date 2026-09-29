@@ -174,6 +174,8 @@ pub(crate) fn command_auth(input: &[u8]) -> IMAPResult<&[u8], CommandBody> {
         getmetadata,
         #[cfg(feature = "ext_namespace")]
         namespace_command,
+        #[cfg(feature = "ext_urlauth")]
+        crate::extensions::urlauth::command,
     ))(input)
 }
 

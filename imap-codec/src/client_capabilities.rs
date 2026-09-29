@@ -209,6 +209,10 @@ impl ClientCapabilities {
             }
             #[cfg(feature = "ext_namespace")]
             CommandBody::Namespace => self.require("NAMESPACE")?,
+            #[cfg(feature = "ext_urlauth")]
+            CommandBody::GenUrlAuth { .. }
+            | CommandBody::UrlFetch { .. }
+            | CommandBody::ResetKey { .. } => self.require("URLAUTH")?,
             CommandBody::Sort {
                 search_criteria, ..
             } => {
