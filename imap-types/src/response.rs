@@ -321,7 +321,7 @@ pub enum Data<'a> {
     /// Generated URLAUTH URLs, in request order.
     #[cfg(feature = "ext_urlauth")]
     GenUrlAuth {
-        urls: crate::core::Vec1<crate::extensions::urlauth::UrlAuthUrl>,
+        urls: crate::core::Vec1<crate::extensions::urlauth::UrlResponse<'a>>,
     },
     /// URL and message-part pairs. NIL is a failed fetch, not an empty part.
     #[cfg(feature = "ext_urlauth")]

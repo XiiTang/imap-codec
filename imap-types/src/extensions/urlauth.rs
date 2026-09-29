@@ -140,8 +140,45 @@ pub struct UrlAuthRequest {
     serde(deny_unknown_fields)
 )]
 pub struct UrlFetchResult<'a> {
-    pub url: ImapMessageUrl,
+    pub url: UrlResponse<'a>,
     pub data: NString<'a>,
+}
+
+/// An observed URL astring. Preserve literal provenance so incremental clients
+/// can replace it with a stream reference instead of interpreting that reference
+/// as a URL. Observed peer values are validated again when used in a command.
+#[derive(Clone, Debug, Eq, PartialEq, Hash, ToStatic)]
+#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+pub struct UrlResponse<'a>(pub crate::core::AString<'a>);
+
+#[cfg(feature = "serde")]
+impl Serialize for UrlResponse<'_> {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use crate::core::{AString, IString};
+        match &self.0 {
+            AString::String(IString::Literal(literal)) => literal.serialize(serializer),
+            value => serializer.serialize_str(
+                std::str::from_utf8(value.as_ref()).map_err(serde::ser::Error::custom)?,
+            ),
+        }
+    }
+}
+#[cfg(feature = "serde")]
+impl<'de, 'a> Deserialize<'de> for UrlResponse<'a> {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum Repr<'a> {
+            Text(String),
+            Literal(crate::core::Literal<'a>),
+        }
+        Ok(Self(match Repr::deserialize(deserializer)? {
+            Repr::Text(text) => {
+                crate::core::AString::try_from(text).map_err(serde::de::Error::custom)?
+            }
+            Repr::Literal(literal) => literal.into(),
+        }))
+    }
 }
 
 /// No mailbox means all keys. Mechanisms may only be specified with a mailbox.

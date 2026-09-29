@@ -13,3 +13,9 @@ Expiration, authorization identity, mailbox ownership and token validity remain
 server decisions. This does not implement URLAUTH=BINARY (RFC 5524).
 
 Validation: `cargo test -p imap-types -p imap-codec --all-features`.
+
+Response URL astrings retain literal provenance, including incremental literal
+references. Atom/quoted response URLs serialize as text; literal URLs use the
+usual literal representation. These observed peer values are validated again
+when supplied as an outgoing command URL. This allows streamed URLFETCH and
+GENURLAUTH literals without interpreting internal stream references as URLs.

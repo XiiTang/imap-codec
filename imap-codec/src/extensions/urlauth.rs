@@ -37,13 +37,8 @@ fn rump(input: &[u8]) -> IMAPResult<&[u8], UrlAuthRump> {
             .ok()
     })(input)
 }
-fn authorized_url(input: &[u8]) -> IMAPResult<&[u8], UrlAuthUrl> {
-    map_opt(astring, |s| {
-        std::str::from_utf8(s.as_ref())
-            .map_err(|_| InvalidUrl)
-            .and_then(UrlAuthUrl::try_from)
-            .ok()
-    })(input)
+fn response_url(input: &[u8]) -> IMAPResult<&[u8], UrlResponse> {
+    map(astring, UrlResponse)(input)
 }
 fn mechanism(input: &[u8]) -> IMAPResult<&[u8], UrlAuthMechanism> {
     map_opt(atom, |s| UrlAuthMechanism::try_from(s.as_ref()).ok())(input)
@@ -92,7 +87,7 @@ pub(crate) fn response(input: &[u8]) -> IMAPResult<&[u8], Data> {
         map(
             preceded(
                 tag_no_case("GENURLAUTH "),
-                separated_list1(sp, authorized_url),
+                separated_list1(sp, response_url),
             ),
             |urls| Data::GenUrlAuth {
                 urls: Vec1::unvalidated(urls),
@@ -101,7 +96,7 @@ pub(crate) fn response(input: &[u8]) -> IMAPResult<&[u8], Data> {
         map(
             preceded(
                 tag_no_case("URLFETCH "),
-                separated_list1(sp, separated_pair(url, sp, nstring)),
+                separated_list1(sp, separated_pair(response_url, sp, nstring)),
             ),
             |items| Data::UrlFetch {
                 results: Vec1::unvalidated(
@@ -155,6 +150,11 @@ impl EncodeIntoContext for UrlAuthRequest {
         self.mechanism.encode_ctx(ctx)
     }
 }
+impl EncodeIntoContext for UrlResponse<'_> {
+    fn encode_ctx(&self, ctx: &mut EncodeContext) -> std::io::Result<()> {
+        self.0.encode_ctx(ctx)
+    }
+}
 impl EncodeIntoContext for UrlFetchResult<'_> {
     fn encode_ctx(&self, ctx: &mut EncodeContext) -> std::io::Result<()> {
         self.url.encode_ctx(ctx)?;
@@ -203,6 +203,21 @@ mod tests {
             reset.body,
             CommandBody::ResetKey { target: Some(_) }
         ));
+    }
+    #[test]
+    fn url_astring_literals_preserve_provenance() {
+        let url = "imap://joe@h/INBOX/;UID=1;URLAUTH=submit+joe:INTERNAL:0123456789abcdef0123456789abcdef01234567";
+        for wire in [
+            format!("* GENURLAUTH {{{}}}\r\n{url}\r\n", url.len()),
+            format!("* URLFETCH {{{}}}\r\n{url} {{3}}\r\nabc\r\n", url.len()),
+        ] {
+            let (rest, response) = ResponseCodec::default().decode(wire.as_bytes()).unwrap();
+            assert!(rest.is_empty());
+            assert_eq!(
+                ResponseCodec::default().encode(&response).dump(),
+                wire.as_bytes()
+            );
+        }
     }
     #[test]
     fn response_nil_empty_and_literal_are_distinct() {
