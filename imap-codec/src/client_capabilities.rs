@@ -210,9 +210,21 @@ impl ClientCapabilities {
             #[cfg(feature = "ext_namespace")]
             CommandBody::Namespace => self.require("NAMESPACE")?,
             #[cfg(feature = "ext_urlauth")]
-            CommandBody::GenUrlAuth { .. }
-            | CommandBody::UrlFetch { .. }
-            | CommandBody::ResetKey { .. } => self.require("URLAUTH")?,
+            CommandBody::GenUrlAuth { .. } | CommandBody::ResetKey { .. } => {
+                self.require("URLAUTH")?
+            }
+            #[cfg(feature = "ext_urlauth")]
+            CommandBody::UrlFetch { urls } => {
+                self.require("URLAUTH")?;
+                if urls.as_ref().iter().any(|url| {
+                    matches!(
+                        url,
+                        imap_types::extensions::urlauth::UrlFetchArgument::Extended(_)
+                    )
+                }) {
+                    self.require("URLAUTH=BINARY")?;
+                }
+            }
             CommandBody::Sort {
                 search_criteria, ..
             } => {

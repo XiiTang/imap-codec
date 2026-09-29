@@ -1565,7 +1565,7 @@ pub enum CommandBody<'a> {
     /// Retrieve message parts addressed by IMAP URLs.
     #[cfg(feature = "ext_urlauth")]
     UrlFetch {
-        urls: crate::core::Vec1<crate::extensions::urlauth::ImapMessageUrl>,
+        urls: crate::core::Vec1<crate::extensions::urlauth::UrlFetchArgument>,
     },
     /// Revoke mailbox URLAUTH keys, or all keys when no target is supplied.
     #[cfg(feature = "ext_urlauth")]

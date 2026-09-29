@@ -2,8 +2,10 @@
 //!
 //! URL text is validated without decoding or normalizing it: URLAUTH tokens cover
 //! the original octets, including the spelling of percent escapes.
-use crate::{core::NString, mailbox::Mailbox};
+use crate::mailbox::Mailbox;
+mod fetch;
 use bounded_static_derive::ToStatic;
+pub use fetch::*;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
@@ -130,18 +132,6 @@ impl ImapMessageUrl {
 pub struct UrlAuthRequest {
     pub url: UrlAuthRump,
     pub mechanism: UrlAuthMechanism,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Hash, ToStatic)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
-#[cfg_attr(
-    feature = "serde",
-    derive(Serialize, Deserialize),
-    serde(deny_unknown_fields)
-)]
-pub struct UrlFetchResult<'a> {
-    pub url: UrlResponse<'a>,
-    pub data: NString<'a>,
 }
 
 /// An observed URL astring. Preserve literal provenance so incremental clients
