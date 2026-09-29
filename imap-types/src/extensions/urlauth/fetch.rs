@@ -78,7 +78,7 @@ fn unique(parameters: impl IntoIterator<Item = UrlFetchParameter>) -> Result<(),
 #[cfg_attr(
     feature = "serde",
     derive(Serialize, Deserialize),
-    serde(try_from = "Vec<UrlFetchParameter>", into = "Vec<UrlFetchParameter>")
+    serde(try_from = "Vec<UrlFetchParameter>")
 )]
 pub struct UrlFetchParameters(Vec<UrlFetchParameter>);
 impl TryFrom<Vec<UrlFetchParameter>> for UrlFetchParameters {
@@ -156,10 +156,7 @@ impl UrlFetchMetadata<'_> {
 #[cfg_attr(
     feature = "serde",
     derive(Serialize, Deserialize),
-    serde(
-        try_from = "Vec1<UrlFetchMetadata<'a>>",
-        into = "Vec1<UrlFetchMetadata<'a>>"
-    )
+    serde(try_from = "Vec1<UrlFetchMetadata<'a>>")
 )]
 pub struct UrlFetchMetadataList<'a>(Vec1<UrlFetchMetadata<'a>>);
 impl<'a> TryFrom<Vec1<UrlFetchMetadata<'a>>> for UrlFetchMetadataList<'a> {
