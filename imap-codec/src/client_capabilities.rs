@@ -23,6 +23,7 @@ pub struct ClientCapabilities {
     advertised: BTreeSet<String>,
     enabled: BTreeSet<String>,
     version: Version,
+    enabling: std::collections::BTreeMap<String, BTreeSet<String>>,
 }
 impl ClientCapabilities {
     pub fn new(advertised: BTreeSet<String>, version: Version) -> Self {
@@ -30,6 +31,7 @@ impl ClientCapabilities {
             advertised,
             enabled: BTreeSet::new(),
             version,
+            enabling: Default::default(),
         }
     }
     pub fn advertised(&self) -> &BTreeSet<String> {
@@ -88,6 +90,25 @@ impl ClientCapabilities {
             Err(format!("IMAP capability {name} has not been enabled"))
         }
     }
+    /// A security layer establishes a new capability trust boundary.
+    pub fn reset_security(&mut self) {
+        self.advertised.clear();
+        self.enabled.clear();
+        self.enabling.clear();
+    }
+    /// Register only commands admitted by the caller and about to be sent.
+    pub fn begin_command(&mut self, tag: &str, body: &CommandBody<'_>) {
+        if let CommandBody::Enable { capabilities } = body {
+            self.enabling.insert(
+                tag.to_owned(),
+                capabilities
+                    .as_ref()
+                    .iter()
+                    .map(|c| c.to_string().to_ascii_uppercase())
+                    .collect(),
+            );
+        }
+    }
     pub fn observe(&mut self, response: &Response<'_>) {
         let caps = match response {
             Response::Data(Data::Capability(c)) => Some(c),
@@ -112,11 +133,19 @@ impl ClientCapabilities {
             self.enabled.extend(
                 capabilities
                     .iter()
-                    .map(|c| c.to_string().to_ascii_uppercase()),
+                    .map(|c| c.to_string().to_ascii_uppercase())
+                    .filter(|c| {
+                        self.enabling
+                            .values()
+                            .any(|requested| requested.contains(c))
+                    }),
             );
             if self.enabled.contains("QRESYNC") {
                 self.enabled.insert("CONDSTORE".into());
             }
+        }
+        if let Response::Status(Status::Tagged(status)) = response {
+            self.enabling.remove(status.tag.inner());
         }
     }
     fn message_set(&self, set: &MessageSet) -> Result<(), String> {
@@ -497,6 +526,14 @@ mod tests {
         );
         assert!(!c.supports("MOVE"));
         assert!(!c.rev2_active());
+        c.begin_command(
+            "A",
+            &CommandCodec::default()
+                .decode(b"A ENABLE IMAP4rev2\r\n")
+                .unwrap()
+                .1
+                .body,
+        );
         c.observe(
             &ResponseCodec::default()
                 .decode(b"* ENABLED IMAP4rev2\r\n")
@@ -525,6 +562,14 @@ mod tests {
         );
         let select = b"A SELECT inbox (QRESYNC (42 1000 1:4294967295 (1:3 4:6)))\r\n";
         assert!(validate(&c, select).is_err());
+        c.begin_command(
+            "A",
+            &CommandCodec::default()
+                .decode(b"A ENABLE QRESYNC\r\n")
+                .unwrap()
+                .1
+                .body,
+        );
         c.observe(
             &ResponseCodec::default()
                 .decode(b"* ENABLED QRESYNC\r\n")
@@ -582,6 +627,14 @@ mod tests {
             Version::Rev1,
         );
         assert!(validate(&c, "A SELECT \"邮件\"\r\n".as_bytes()).is_err());
+        c.begin_command(
+            "A",
+            &CommandCodec::default()
+                .decode(b"A ENABLE UTF8=ACCEPT\r\n")
+                .unwrap()
+                .1
+                .body,
+        );
         c.observe(
             &ResponseCodec::default()
                 .decode(b"* ENABLED UTF8=ACCEPT\r\n")
