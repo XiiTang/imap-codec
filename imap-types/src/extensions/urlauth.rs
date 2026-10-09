@@ -134,42 +134,14 @@ pub struct UrlAuthRequest {
     pub mechanism: UrlAuthMechanism,
 }
 
-/// An observed URL astring. Preserve literal provenance so incremental clients
-/// can replace it with a stream reference instead of interpreting that reference
-/// as a URL. Observed peer values are validated again when used in a command.
+/// A URL as a server sent it in a GENURLAUTH or URLFETCH response, kept as its
+/// astring. A client relays these URLs rather than interpreting them, so a URL
+/// the validator refuses does not make the whole response undecodable; it is
+/// validated as an `ImapMessageUrl` when supplied in a command.
 #[derive(Clone, Debug, Eq, PartialEq, Hash, ToStatic)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct UrlResponse<'a>(pub crate::core::AString<'a>);
-
-#[cfg(feature = "serde")]
-impl Serialize for UrlResponse<'_> {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        use crate::core::{AString, IString};
-        match &self.0 {
-            AString::String(IString::Literal(literal)) => literal.serialize(serializer),
-            value => serializer.serialize_str(
-                std::str::from_utf8(value.as_ref()).map_err(serde::ser::Error::custom)?,
-            ),
-        }
-    }
-}
-#[cfg(feature = "serde")]
-impl<'de, 'a> Deserialize<'de> for UrlResponse<'a> {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        #[derive(Deserialize)]
-        #[serde(untagged)]
-        enum Repr<'a> {
-            Text(String),
-            Literal(crate::core::Literal<'a>),
-        }
-        Ok(Self(match Repr::deserialize(deserializer)? {
-            Repr::Text(text) => {
-                crate::core::AString::try_from(text).map_err(serde::de::Error::custom)?
-            }
-            Repr::Literal(literal) => literal.into(),
-        }))
-    }
-}
 
 /// No mailbox means all keys. Mechanisms may only be specified with a mailbox.
 #[derive(Clone, Debug, Eq, PartialEq, Hash, ToStatic)]

@@ -399,9 +399,12 @@ mod tests {
         ));
     }
     #[test]
-    fn url_astring_literals_preserve_provenance() {
-        let url = "imap://joe@h/INBOX/;UID=1;URLAUTH=submit+joe:INTERNAL:0123456789abcdef0123456789abcdef01234567";
+    fn response_urls_decode_without_url_validation() {
+        // A server's URL the validator refuses still decodes, as an atom or a literal.
+        let url = "imap://joe@h/INBOX/;UID=1;URLAUTH=submit+joe:INTERNAL:abcd";
+        assert!(imap_types::extensions::urlauth::UrlAuthUrl::try_from(url).is_err());
         for wire in [
+            format!("* GENURLAUTH {url}\r\n"),
             format!("* GENURLAUTH {{{}}}\r\n{url}\r\n", url.len()),
             format!("* URLFETCH {{{}}}\r\n{url} {{3}}\r\nabc\r\n", url.len()),
         ] {

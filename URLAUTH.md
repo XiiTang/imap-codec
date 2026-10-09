@@ -23,11 +23,11 @@ distinct. The codec does not decode MIME content or change server responses.
 
 Validation: `cargo test -p imap-types -p imap-codec --all-features`.
 
-Response URL astrings retain literal provenance, including incremental literal
-references. Atom/quoted response URLs serialize as text; literal URLs use the
-usual literal representation. These observed peer values are validated again
-when supplied as an outgoing command URL. This allows streamed URLFETCH and
-GENURLAUTH literals without interpreting internal stream references as URLs.
+GENURLAUTH and URLFETCH response URLs decode as the astrings the server sent
+(`UrlResponse`), atom, quoted or literal, and encode back unchanged. A client
+relays these URLs rather than interpreting them, so a server URL the validator
+refuses does not make the whole response undecodable; it is validated when
+supplied in a command. Regression: `response_urls_decode_without_url_validation`.
 
 RFC 5524 regressions cover mixed/empty parameter lists, capability admission,
 serde validation, structured metadata, NUL-containing literal8, empty content,
