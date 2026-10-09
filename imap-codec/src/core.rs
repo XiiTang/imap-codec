@@ -155,7 +155,7 @@ pub(crate) fn literal(input: &[u8]) -> IMAPResult<&[u8], Literal> {
         delimited(
             tag(b"{"),
             tuple((
-                crate::extensions::rev2::number63,
+                number,
                 map(opt(char('+')), |i| {
                     i.map(|_| LiteralMode::NonSync).unwrap_or(LiteralMode::Sync)
                 }),
@@ -179,12 +179,6 @@ pub(crate) fn literal(input: &[u8]) -> IMAPResult<&[u8], Literal> {
         }));
     }
 
-    let length = usize::try_from(length).map_err(|_| {
-        nom::Err::Failure(IMAPParseError {
-            input,
-            kind: IMAPErrorKind::BadNumber,
-        })
-    })?;
     let (remaining, data) = take(length)(remaining)?;
 
     match Literal::try_from(data) {

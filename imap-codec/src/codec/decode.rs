@@ -48,7 +48,7 @@ pub(crate) struct IMAPParseError<'a, I> {
 pub(crate) enum IMAPErrorKind<'a> {
     Literal {
         tag: Option<Tag<'a>>,
-        length: u64,
+        length: u32,
         mode: LiteralMode,
     },
     BadNumber,
@@ -202,7 +202,7 @@ pub enum CommandDecodeError<'a> {
         tag: Tag<'a>,
 
         /// Literal length.
-        length: u64,
+        length: u32,
 
         /// Literal mode, i.e., sync or non-sync.
         mode: LiteralMode,
@@ -264,7 +264,7 @@ pub enum ResponseDecodeError {
     /// saving the bytes in memory. Or, it can close the connection.
     LiteralFound {
         /// Literal length.
-        length: u64,
+        length: u32,
     },
 
     /// Decoding failed.
