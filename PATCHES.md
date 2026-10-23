@@ -102,3 +102,12 @@ Boundless holds every response and APPEND literal whole within its size limit,
 so the streaming response decoder with its literal references and 63-bit
 literal lengths (5a5e505), streamed APPEND encoding (from 25c307a) and response
 URL literal provenance (from 2b684e3) are gone.
+
+## Fixed certificate verification in the 0.103 test graph (#312)
+
+Update the root workspace lockfile's rustls-webpki 0.103.8 to 0.103.16, the
+smallest fixed patch for RUSTSEC-2026-0382. This rejects distrusted emSign
+intermediate public keys in that TLS graph without changing codec code,
+generated protocol definitions or public types. Regression coverage:
+`cargo test -p imap-codec -p imap-types --all-features --locked`, plus
+Boundless's IMAP and SMTP tests in its complete library suite.
