@@ -372,8 +372,16 @@ pub enum MessageDataItem<'a> {
     /// ```
     Uid(NonZeroU32),
 
+    /// ```imap
+    /// BINARY[<section-binary>]<<number>>
+    /// ```
     Binary {
         section: Vec<NonZeroU32>,
+        /// If present, the offset within the decoded section data at which
+        /// this partial content starts (RFC 9051 section 7.5.2, RFC 3516
+        /// section 4.2), as a server answers a
+        /// `BINARY[<section-binary>]<<partial>>` request.
+        origin: Option<u64>,
         value: NString8<'a>,
     },
 

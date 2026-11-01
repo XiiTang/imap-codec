@@ -183,9 +183,13 @@ pub(crate) fn msg_att_dynamic(input: &[u8]) -> IMAPResult<&[u8], MessageDataItem
 ///                  "BODY" ["STRUCTURE"] SP body /
 ///                  "BODY" section ["<" number ">"] SP nstring /
 ///                  "UID" SP uniqueid /
-///                  "BINARY" section-binary SP (nstring / literal8) / ; RFC 3516
+///                  "BINARY" section-binary ["<" number ">"] SP (nstring / literal8) / ; RFC 3516
 ///                  "BINARY.SIZE" section-binary SP number            ; RFC 3516
 /// ```
+///
+/// RFC 3516 and RFC 9051 leave the origin out of the ABNF, though their text
+/// (`BINARY[<section-binary>]<<number>>`) and servers such as Dovecot send it
+/// for a partial request, as for BODY.
 ///
 /// Note: MUST NOT change for a message
 pub(crate) fn msg_att_static(input: &[u8]) -> IMAPResult<&[u8], MessageDataItem> {
@@ -251,13 +255,22 @@ pub(crate) fn msg_att_static(input: &[u8]) -> IMAPResult<&[u8], MessageDataItem>
             tuple((
                 tag_no_case(b"BINARY"),
                 section_binary,
+                opt(delimited(
+                    tag(b"<"),
+                    crate::extensions::rev2::number63,
+                    tag(b">"),
+                )),
                 sp,
                 alt((
                     map(nstring, NString8::NString),
                     map(literal8, NString8::Literal8),
                 )),
             )),
-            |(_, section, _, value)| MessageDataItem::Binary { section, value },
+            |(_, section, origin, _, value)| MessageDataItem::Binary {
+                section,
+                origin,
+                value,
+            },
         ),
         map(
             tuple((
@@ -407,6 +420,57 @@ mod tests {
         for test in tests {
             known_answer_test_encode(test);
         }
+    }
+
+    /// Dovecot answers a partial BINARY fetch with the origin, as for BODY.
+    #[test]
+    fn binary_response_keeps_its_partial_origin() {
+        use imap_types::{
+            core::{LiteralMode, NString8, Vec1},
+            extensions::binary::Literal8,
+            response::{Data, Response},
+        };
+
+        use crate::testing::kat_inverse_response;
+
+        let fetched = |origin, data: &'static [u8]| {
+            Response::Data(Data::Fetch {
+                seq: 1.try_into().unwrap(),
+                items: Vec1::from(MessageDataItem::Binary {
+                    section: vec![1.try_into().unwrap()],
+                    origin,
+                    value: NString8::Literal8(Literal8 {
+                        data: data.into(),
+                        mode: LiteralMode::Sync,
+                    }),
+                }),
+            })
+        };
+        kat_inverse_response(&[
+            (
+                b"* 1 FETCH (BINARY[1]<0> ~{5}\r\nhello)\r\n".as_ref(),
+                b"".as_ref(),
+                fetched(Some(0), b"hello"),
+            ),
+            (
+                b"* 1 FETCH (BINARY[1]<6> ~{6}\r\nbinary)\r\n".as_ref(),
+                b"".as_ref(),
+                fetched(Some(6), b"binary"),
+            ),
+            (
+                b"* 1 FETCH (BINARY[1] ~{18}\r\nhello binary world)\r\n".as_ref(),
+                b"".as_ref(),
+                fetched(None, b"hello binary world"),
+            ),
+        ]);
+        known_answer_test_encode((
+            MessageDataItem::Binary {
+                section: vec![1.try_into().unwrap()],
+                origin: Some(0),
+                value: NString8::NString(NString(None)),
+            },
+            b"BINARY[1]<0> NIL",
+        ));
     }
 
     #[test]

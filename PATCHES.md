@@ -88,6 +88,23 @@ and escapes. The unchecked constructor remains explicitly unchecked. Fork tests:
 `test_kat_inverse_create_utf8`, `parse_namespace_response_nul`. Drop it when
 moving to an upstream release that contains #730.
 
+### BINARY response origin (2026-11-01)
+
+A server answers a partial `BINARY[<section>]<<partial>>` fetch with the
+origin, `* 1 FETCH (BINARY[1]<0> ~{5}\r\nhello)`, as it does for BODY:
+Dovecot 2.4.5 sends exactly this (`src/imap/imap-fetch-body.c`,
+`get_body_name`), and RFC 3516 section 4.2 and RFC 9051 section 7.5.2 describe
+the result as `BINARY[<section-binary>]<<number>>`, although their ABNF leaves
+the origin out. Upstream follows the ABNF, so the whole response fails to
+decode and Boundless's connection ends (Boundless #432).
+`MessageDataItem::Binary` gains `origin: Option<u64>`; `msg_att_static`
+parses an optional `<number63>` after the section, and the encoder writes it,
+both exactly as for `BodyExt`. Fork test:
+`fetch::tests::binary_response_keeps_its_partial_origin`. Boundless:
+`each_operation_answers_the_server_data_it_asked_for` (out-of-order partial
+BINARY replies placed by origin) and the independent Dovecot test's partial
+`binary_sections`.
+
 ## Upstream changes not taken
 
 The MODSEQ parenthesis encoding is already identical to upstream ad06aac38;

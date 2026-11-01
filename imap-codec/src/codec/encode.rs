@@ -1829,10 +1829,18 @@ impl EncodeIntoContext for MessageDataItem<'_> {
                 nstring.encode_ctx(ctx)
             }
             Self::Uid(uid) => write!(ctx, "UID {uid}"),
-            Self::Binary { section, value } => {
+            Self::Binary {
+                section,
+                origin,
+                value,
+            } => {
                 ctx.write_all(b"BINARY[")?;
                 join_serializable(section, b".", ctx)?;
-                ctx.write_all(b"] ")?;
+                ctx.write_all(b"]")?;
+                if let Some(origin) = origin {
+                    write!(ctx, "<{origin}>")?;
+                }
+                ctx.write_all(b" ")?;
                 value.encode_ctx(ctx)
             }
             Self::BinarySize { section, size } => {
