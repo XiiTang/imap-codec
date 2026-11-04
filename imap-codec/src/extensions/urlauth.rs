@@ -281,8 +281,7 @@ mod tests {
         response::{Data, Response},
     };
     #[test]
-    fn extended_arguments_round_trip_and_require_their_capability() {
-        use crate::client_capabilities::{ClientCapabilities, Version};
+    fn extended_arguments_round_trip_and_reject_invalid_parameters() {
         let url = "imap://joe@h/INBOX/;UID=1/;SECTION=1";
         for arguments in [
             format!("({url} BINARY BODYPARTSTRUCTURE)"),
@@ -296,17 +295,6 @@ mod tests {
                 CommandCodec::default().encode(&command).dump(),
                 wire.as_bytes()
             );
-            for (caps, permitted) in [
-                (vec!["URLAUTH"], false),
-                (vec!["URLAUTH", "BINARY"], false),
-                (vec!["URLAUTH", "URLAUTH=BINARY"], true),
-            ] {
-                let state = ClientCapabilities::new(
-                    caps.into_iter().map(str::to_owned).collect(),
-                    Version::Rev1,
-                );
-                assert_eq!(state.validate(&command.body).is_ok(), permitted);
-            }
         }
         for parameters in [
             "BODY BINARY",

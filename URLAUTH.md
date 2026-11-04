@@ -1,7 +1,8 @@
 # URLAUTH extension
 
 The `ext_urlauth` feature implements RFC 4467 GENURLAUTH, URLFETCH,
-RESETKEY, URLMECH, capability admission, and RFC 5092 absolute message URLs.
+RESETKEY, URLMECH and RFC 5092 absolute message URLs. Capability admission
+belongs to Boundless `src/protocols/imap/capabilities.rs`.
 URL wrappers validate percent escapes, IMAP userinfo (which has no password
 slot), message identifiers, sections, ranges, expiration syntax, access scopes,
 mechanisms and tokens. They preserve original octets for URLAUTH signing.
@@ -15,7 +16,8 @@ server decisions.
 RFC 5524 URLAUTH=BINARY uses per-URL `UrlFetchArgument::Extended` requests
 with BODY, BINARY or BODYPARTSTRUCTURE parameters. Bare URL strings retain
 RFC 4467 behavior and may be mixed with extended requests in the same command.
-Extended syntax requires the advertised URLAUTH=BINARY capability. Parameters
+Boundless requires the advertised URLAUTH=BINARY capability for extended
+requests; the codec parses and encodes their syntax. Parameters
 and response metadata cannot contain duplicates or combine BODY with BINARY.
 Binary responses reuse NString8/literal8; body structure uses the existing
 bounded recursive parser. URL failure NIL, BINARY NIL and empty literals are
@@ -29,6 +31,9 @@ relays these URLs rather than interpreting them, so a server URL the validator
 refuses does not make the whole response undecodable; it is validated when
 supplied in a command. Regression: `response_urls_decode_without_url_validation`.
 
-RFC 5524 regressions cover mixed/empty parameter lists, capability admission,
+RFC 5524 codec regressions cover mixed/empty parameter lists,
 serde validation, structured metadata, NUL-containing literal8, empty content,
 both NIL forms, malformed duplicate metadata, and truncated response prefixes.
+
+Boundless capability-admission regressions live in its `protocols::imap`
+`urlauth` and `urlauth_binary` tests.
